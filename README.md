@@ -1,3 +1,9 @@
+what to do 
+1. Clone repository
+2. Run npm install
+3. Add water-dispenser-key.json to home/water-dashboard
+4. Run npm run dev
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
