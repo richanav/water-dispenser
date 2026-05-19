@@ -4,6 +4,11 @@ what to do
 3. Add water-dispenser-key.json to home/water-dashboard
 4. Run npm run dev
 
+   
+please note
+server.js contains backend i.e connecting esp32 to firebase
+App.jsx contains dashboard
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
