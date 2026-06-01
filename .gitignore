@@ -27,3 +27,8 @@ dist-ssr
 firebase-adminsdk.json
 secrets.h
 water-dispenser-key.json
+
+node_modules/
+.env
+water-dispenser-key*.json
+auth_info_baileys/   
