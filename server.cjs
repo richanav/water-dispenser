@@ -14,7 +14,7 @@ const {
 } = require("@whiskeysockets/baileys");
 
 const qrcode = require("qrcode-terminal");
-
+const QRCode = require("qrcode");
 /* FIREBASE SETUP */
 
 const serviceAccount = JSON.parse(
@@ -170,10 +170,16 @@ app.get("/", (req, res) => {
 
 /* MAIN ROUTE */
 
+/* MAIN ROUTE */
+
 app.post(
     "/update-water-level",
 
     async (req, res) => {
+
+        console.log(
+            "\n🔥 API CALLED 🔥"
+        );
 
         try {
 
@@ -182,81 +188,196 @@ app.post(
             console.log("\nReceived Data:");
             console.log(data);
 
-            /* STORE TO FIREBASE */
-
-            await db
+            const deviceRef = db
                 .collection("devices")
-                .doc(data.device_id)
-                .set({
+                .doc(data.device_id);
 
-                    water_level:
-                        data.water_level,
+            /* GET PREVIOUS DATA */
 
-                    battery:
-                        data.battery,
+            const oldDoc =
+                await deviceRef.get();
 
-                    status:
-                        "online",
+            const previousLevel =
+                oldDoc.exists
+                    ? String(
+                        oldDoc.data()
+                            .water_level || ""
+                      )
+                          .trim()
+                          .toLowerCase()
+                    : "";
 
-                    timestamp:
-                        Date.now()
-                });
+            /* CURRENT LEVEL */
+
+            const currentLevel =
+                String(data.water_level)
+                    .trim()
+                    .toLowerCase();
+
+            console.log(
+                "Previous Level:",
+                previousLevel
+            );
+
+            console.log(
+                "Current Level:",
+                currentLevel
+            );
+
+            /* STORE LATEST DATA */
+
+            await deviceRef.set({
+
+                water_level:
+                    currentLevel,
+
+                battery:
+                    data.battery,
+
+                status:
+                    "online",
+
+                timestamp:
+                    Date.now()
+
+            });
 
             console.log(
                 "✅ Firebase Updated"
             );
 
-            /* WHATSAPP ALERT */
+            /* ==========================
+               STATE CHANGE DETECTION
+               ==========================
 
-            console.log(
-                "Checking water level..."
-            );
+               HIGH -> LOW
+               Send Payment QR
 
-            const waterLevel =
-                String(data.water_level)
-                .trim()
-                .toLowerCase();
+               LOW -> LOW
+               Do Nothing
 
-            console.log(
-                "Processed Level:"
-            );
+               LOW -> HIGH
+               Send Refilled Message
 
-            console.log(waterLevel);
+               HIGH -> HIGH
+               Do Nothing
+            */
 
             if (
-                waterLevel.includes("low")
+                previousLevel === "high" &&
+                currentLevel === "low"
             ) {
 
                 console.log(
-                    "LOW water level detected"
+                    "🚨 HIGH -> LOW detected"
                 );
 
                 try {
 
+                    const upiId =
+                        "richaroy495@oksbi";
+
+                    const payeeName =
+                        "Water Vendor";
+
+                    const amount =
+                        "1";
+
+                    const note =
+                        `Refill for ${data.device_id}`;
+
+                    const upiLink =
+                        `upi://pay?pa=${upiId}` +
+                        `&pn=${encodeURIComponent(
+                            payeeName
+                        )}` +
+                        `&am=${amount}` +
+                        `&cu=INR` +
+                        `&tn=${encodeURIComponent(
+                            note
+                        )}`;
+
+                    const qrPath =
+                        `./upi-${data.device_id}.png`;
+
+                    await QRCode.toFile(
+                        qrPath,
+                        upiLink
+                    );
+
                     console.log(
-                        "Sending WhatsApp message..."
+                        "✅ QR Generated"
                     );
 
                     await sock.sendMessage(
                         "919745554888@s.whatsapp.net",
                         {
-                            text:
-                                "🚨 Water dispenser EMPTY"
+                            image:
+                                fs.readFileSync(
+                                    qrPath
+                                ),
+
+                            caption:
+`🚨 Water dispenser EMPTY
+
+💳 Scan QR to Pay
+
+Amount: ₹${amount}`
                         }
                     );
 
                     console.log(
-                        "✅ WhatsApp message sent"
+                        "✅ WhatsApp QR sent"
                     );
 
                 } catch (err) {
 
                     console.log(
-                        "❌ WhatsApp Error:"
+                        "❌ WhatsApp Error"
                     );
 
                     console.log(err);
                 }
+            }
+
+            else if (
+                previousLevel === "low" &&
+                currentLevel === "high"
+            ) {
+
+                console.log(
+                    "✅ LOW -> HIGH detected"
+                );
+
+                try {
+
+                    await sock.sendMessage(
+                        "919745554888@s.whatsapp.net",
+                        {
+                            text:
+                                "✅ Water dispenser REFILLED"
+                        }
+                    );
+
+                    console.log(
+                        "✅ Refill message sent"
+                    );
+
+                } catch (err) {
+
+                    console.log(
+                        "❌ WhatsApp Error"
+                    );
+
+                    console.log(err);
+                }
+            }
+
+            else {
+
+                console.log(
+                    "ℹ️ No state change. No alert sent."
+                );
             }
 
             res.send(
@@ -271,10 +392,9 @@ app.post(
         }
     }
 );
-
 /* START SERVER */
 
-app.listen(3000, () => {
+app.listen(3000, "0.0.0.0", () => {
 
     console.log(
         "\n🚀 Server running on port 3000\n"
