@@ -28,6 +28,9 @@ function App() {
   const [alertCounts, setAlertCounts] = useState([0, 0, 0, 0])
   const totalAlerts = alertCounts.reduce((sum, count) => sum + count, 0)
   const averageAlerts = (totalAlerts / 4).toFixed(1)
+  const [currentStatus, setCurrentStatus] = useState("SUFFICIENT")
+  const [tanks, setTanks] = useState([])
+  const [activePage, setActivePage] = useState("dashboard")
 
 useEffect(() => {
   const unsubscribe = onSnapshot(
@@ -54,7 +57,21 @@ useEffect(() => {
   return () => unsubscribe()
 }, [])
 
-  
+useEffect(() => {
+  const unsubscribe = onSnapshot(
+    collection(db, "devices"),
+    (snapshot) => {
+      const tankList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+
+      setTanks(tankList)
+    }
+  )
+
+  return () => unsubscribe()
+}, [])  
 
   const lowWaterAlertData = {
     labels: [
@@ -84,18 +101,18 @@ useEffect(() => {
         {/* SIDEBAR */}
         <div className="w-[250px] min-h-screen bg-[#0f172a] border-r border-gray-800 p-6">
           <h1 className="text-3xl font-bold text-blue-400 mb-10">
-            AquaTrack
+            AquaAlert
           </h1>
 
           <div className="space-y-4">
-            <MenuItem text="Dashboard" active />
-            <MenuItem text="My Tank" />
-            <MenuItem text="Deliveries" />
-            <MenuItem text="Wallet & Payments" />
-            <MenuItem text="Transactions" />
-            <MenuItem text="Invoices" />
-            <MenuItem text="Alerts" />
-            <MenuItem text="Reports" />
+            <MenuItem text="Dashboard" active={activePage === "dashboard"} onClick={() => setActivePage("dashboard")} />
+            <MenuItem text="My Tank" active={activePage === "tank"} onClick={() => setActivePage("tank")} />
+            <MenuItem text="Deliveries" active={activePage === "deliveries"} onClick={() => setActivePage("deliveries")} />
+            <MenuItem text="Wallet & Payments" active={activePage === "wallet"} onClick={() => setActivePage("wallet")} />
+            <MenuItem text="Transactions" active={activePage === "transactions"} onClick={() => setActivePage("transactions")} />
+            <MenuItem text="Invoices" active={activePage === "invoices"} onClick={() => setActivePage("invoices")} />
+            <MenuItem text="Alerts" active={activePage === "alerts"} onClick={() => setActivePage("alerts")} />
+            <MenuItem text="Reports" active={activePage === "reports"} onClick={() => setActivePage("reports")} />
           </div>
         </div>
 
@@ -106,12 +123,16 @@ useEffect(() => {
           <TopNavbar />
 
           {/* TOP STATS */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+    {activePage === "dashboard" && (
+  <>
+    {/* your current dashboard content */}
+  </>
+)}      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
             <StatCard
-              title="Tanks Monitored"
-              value="1"
-              sub="Active"
-              badge="Online"
+            title="Tanks Monitored"
+            value={tanks.length}
+            sub="Active"
+            badge="Online"
             />
 
             <StatCard
@@ -162,12 +183,20 @@ useEffect(() => {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 max-w-md">
-                  <TankCard
-                    name="Tank 1"
-                    level={72}
-                    status="Normal"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {tanks.map((tank) => {
+                  const status = String(tank.water_level).toLowerCase()
+                  const isLow = status === "low"
+
+                  return (
+                    <TankCard
+                      key={tank.id}
+                      name={tank.device_id || tank.id}
+                      status={isLow ? "LOW WATER" : "SUFFICIENT"}
+                      danger={isLow}
+                    />
+                  )
+                })}
                 </div>
               </div>
 
@@ -286,9 +315,10 @@ function TopNavbar() {
 }
 
 /* MENU */
-function MenuItem({ text, active }) {
+function MenuItem({ text, active, onClick }) {
   return (
     <div
+      onClick={onClick}
       className={`px-4 py-3 rounded-xl cursor-pointer transition ${
         active
           ? "bg-blue-600 text-white"
@@ -353,22 +383,16 @@ function StatCard({
 }
 
 /* TANK CARD */
-function TankCard({
-  name,
-  level,
-  status,
-  danger,
-}) {
+function TankCard({ name, status, danger }) {
   return (
     <div
-      className={`rounded-2xl p-4 border hover:-translate-y-1 transition ${
+      className={`w-full max-w-md rounded-2xl p-4 border hover:-translate-y-1 transition ${
         danger
           ? "bg-[#2a1a1a] border-red-800"
           : "bg-[#111827] border-gray-800"
       }`}
     >
-      <div className="flex justify-between">
-
+      <div className="flex justify-between items-center gap-3">
         <h4 className="font-semibold text-xl">
           {name}
         </h4>
@@ -380,49 +404,33 @@ function TankCard({
               : "bg-green-900 text-green-300"
           }`}
         >
-          {status}
+          {danger ? "LOW" : "SUFFICIENT"}
         </span>
-
       </div>
 
-      {/* TANK VISUAL */}
-      <div className="mt-5 h-40 flex items-end justify-center">
-
-        <div className="w-28 h-40 border-2 border-blue-400 rounded-b-2xl rounded-t-lg relative overflow-hidden bg-[#0f172a]">
-
+      <div className="mt-5 h-52 flex items-end justify-center">
+        <div className="w-32 h-44 border-2 border-blue-400 rounded-b-2xl rounded-t-lg relative overflow-hidden bg-[#0f172a]">
           <div
-            className={`absolute bottom-0 w-full ${
+            className={`absolute bottom-0 w-full transition-all duration-500 ${
               danger
-                ? "bg-red-500"
-                : "bg-blue-500"
+                ? "bg-red-500 h-[25%]"
+                : "bg-blue-500 h-[75%]"
             }`}
-            style={{
-              height: `${level}%`,
-            }}
           ></div>
-
         </div>
       </div>
 
-      <p className="text-center font-bold text-3xl mt-3">
-        {level}%
+      <p
+        className={`text-center font-bold text-3xl mt-4 ${
+          danger ? "text-red-400" : "text-blue-400"
+        }`}
+      >
+        {danger ? "LOW WATER" : "SUFFICIENT"}
       </p>
 
-      {/* PROGRESS */}
-      <div className="w-full bg-gray-700 h-3 rounded-full mt-5 overflow-hidden">
-
-        <div
-          className={`h-full rounded-full ${
-            danger
-              ? "bg-red-500"
-              : "bg-blue-500"
-          }`}
-          style={{
-            width: `${level}%`,
-          }}
-        ></div>
-
-      </div>
+      <p className="text-center text-gray-400 text-sm mt-2">
+        Water Status
+      </p>
     </div>
   )
 }

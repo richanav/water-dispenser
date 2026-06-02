@@ -246,6 +246,31 @@ app.post(
                 "✅ Firebase Updated"
             );
 
+
+             /* STORE LOW WATER ALERT */
+
+            if (currentLevel === "low") {
+
+            await db
+            .collection("low_water_alerts")
+            .add({
+
+            device_id:
+                data.device_id,
+
+            water_level:
+                currentLevel,
+
+            createdAt:
+                new Date()
+
+            });
+
+            console.log(
+              "✅ Low water alert stored"
+            );
+            }
+
             /* ==========================
                STATE CHANGE DETECTION
                ==========================
@@ -275,7 +300,7 @@ app.post(
                 try {
 
                     const upiId =
-                        "richaroy495@oksbi";
+                        "acd@oksbi";
 
                     const payeeName =
                         "Water Vendor";
