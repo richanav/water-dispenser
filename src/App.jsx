@@ -27,6 +27,7 @@ function App() {
   const [alertCounts, setAlertCounts] = useState([0, 0, 0, 0])
   const [tanks, setTanks] = useState([])
   const [activePage, setActivePage] = useState("dashboard")
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
 
   const totalAlerts = alertCounts.reduce((sum, count) => sum + count, 0)
   const averageAlerts = (totalAlerts / 4).toFixed(1)
@@ -42,9 +43,14 @@ function App() {
           const date = data.createdAt?.toDate?.()
 
           if (date) {
-            const day = date.getDate()
-            const week = Math.min(Math.ceil(day / 7), 4)
-            weekCounts[week - 1]++
+            const alertMonth = date.getMonth()
+
+            if (alertMonth === selectedMonth) {
+              const day = date.getDate()
+              const week = Math.min(Math.ceil(day / 7), 4)
+
+              weekCounts[week - 1]++
+            }
           }
         })
 
@@ -53,7 +59,7 @@ function App() {
     )
 
     return () => unsubscribe()
-  }, [])
+  }, [selectedMonth])
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -86,26 +92,63 @@ function App() {
   return (
     <div className="min-h-screen bg-[#0b1120] text-white">
       <div className="flex">
-
         <div className="w-[250px] min-h-screen bg-[#0f172a] border-r border-gray-800 p-6">
           <h1 className="text-3xl font-bold text-blue-400 mb-10">
             AquaAlert
           </h1>
 
           <div className="space-y-4">
-            <MenuItem text="Dashboard" active={activePage === "dashboard"} onClick={() => setActivePage("dashboard")} />
-            <MenuItem text="My Tank" active={activePage === "tank"} onClick={() => setActivePage("tank")} />
-            <MenuItem text="Deliveries" active={activePage === "deliveries"} onClick={() => setActivePage("deliveries")} />
-            <MenuItem text="Wallet & Payments" active={activePage === "wallet"} onClick={() => setActivePage("wallet")} />
-            <MenuItem text="Transactions" active={activePage === "transactions"} onClick={() => setActivePage("transactions")} />
-            <MenuItem text="Invoices" active={activePage === "invoices"} onClick={() => setActivePage("invoices")} />
-            <MenuItem text="Alerts" active={activePage === "alerts"} onClick={() => setActivePage("alerts")} />
-            <MenuItem text="Reports" active={activePage === "reports"} onClick={() => setActivePage("reports")} />
+            <MenuItem
+              text="Dashboard"
+              active={activePage === "dashboard"}
+              onClick={() => setActivePage("dashboard")}
+            />
+
+            <MenuItem
+              text="My Tank"
+              active={activePage === "tank"}
+              onClick={() => setActivePage("tank")}
+            />
+
+            <MenuItem
+              text="Deliveries"
+              active={activePage === "deliveries"}
+              onClick={() => setActivePage("deliveries")}
+            />
+
+            <MenuItem
+              text="Wallet & Payments"
+              active={activePage === "wallet"}
+              onClick={() => setActivePage("wallet")}
+            />
+
+            <MenuItem
+              text="Transactions"
+              active={activePage === "transactions"}
+              onClick={() => setActivePage("transactions")}
+            />
+
+            <MenuItem
+              text="Invoices"
+              active={activePage === "invoices"}
+              onClick={() => setActivePage("invoices")}
+            />
+
+            <MenuItem
+              text="Alerts"
+              active={activePage === "alerts"}
+              onClick={() => setActivePage("alerts")}
+            />
+
+            <MenuItem
+              text="Graph"
+              active={activePage === "graph"}
+              onClick={() => setActivePage("graph")}
+            />
           </div>
         </div>
 
         <div className="flex-1 p-6">
-
           {activePage === "dashboard" && (
             <>
               <TopNavbar />
@@ -164,7 +207,6 @@ function App() {
                           <TankCard
                             key={tank.id}
                             name={tank.device_id || tank.id}
-                            status={isLow ? "LOW WATER" : "SUFFICIENT"}
                             danger={isLow}
                           />
                         )
@@ -172,9 +214,11 @@ function App() {
                     </div>
                   </div>
 
-                  <ChartCard title="Monthly Low Water Alerts">
-                    <Bar data={lowWaterAlertData} options={chartOptions} />
-                  </ChartCard>
+                  <MonthlyGraph
+                    selectedMonth={selectedMonth}
+                    setSelectedMonth={setSelectedMonth}
+                    lowWaterAlertData={lowWaterAlertData}
+                  />
                 </div>
 
                 <div className="space-y-6">
@@ -219,7 +263,6 @@ function App() {
                     <TankCard
                       key={tank.id}
                       name={tank.device_id || tank.id}
-                      status={isLow ? "LOW WATER" : "SUFFICIENT"}
                       danger={isLow}
                     />
                   )
@@ -228,13 +271,25 @@ function App() {
             </div>
           )}
 
+          {activePage === "graph" && (
+            <div>
+              <h1 className="text-4xl font-bold mb-6">
+                Graph
+              </h1>
+
+              <MonthlyGraph
+                selectedMonth={selectedMonth}
+                setSelectedMonth={setSelectedMonth}
+                lowWaterAlertData={lowWaterAlertData}
+              />
+            </div>
+          )}
+
           {activePage === "deliveries" && <Page title="Deliveries" />}
           {activePage === "wallet" && <Page title="Wallet & Payments" />}
           {activePage === "transactions" && <Page title="Transactions" />}
           {activePage === "invoices" && <Page title="Invoices" />}
           {activePage === "alerts" && <Page title="Alerts" />}
-          {activePage === "reports" && <Page title="Reports" />}
-
         </div>
       </div>
     </div>
@@ -326,7 +381,7 @@ function StatCard({ title, value, sub, danger, badge, gradient }) {
   )
 }
 
-function TankCard({ name, status, danger }) {
+function TankCard({ name, danger }) {
   return (
     <div
       className={`w-full max-w-md rounded-2xl p-4 border hover:-translate-y-1 transition ${
@@ -338,15 +393,11 @@ function TankCard({ name, status, danger }) {
       <div className="flex justify-between items-center gap-3">
         <h4 className="font-semibold text-xl">{name}</h4>
 
-        <span
-          className={`text-xs px-3 py-2 rounded-full ${
-            danger
-              ? "bg-red-900 text-red-300"
-              : "bg-green-900 text-green-300"
-          }`}
-        >
-          {danger ? "LOW" : "SUFFICIENT"}
-        </span>
+        {danger && (
+          <span className="text-xs px-3 py-2 rounded-full bg-red-900 text-red-300">
+            LOW
+          </span>
+        )}
       </div>
 
       <div className="mt-5 h-52 flex items-end justify-center">
@@ -361,24 +412,48 @@ function TankCard({ name, status, danger }) {
 
       <p
         className={`text-center font-bold text-3xl mt-4 ${
-          danger ? "text-red-400" : "text-blue-400"
+          danger ? "text-red-400" : "text-green-400"
         }`}
       >
         {danger ? "LOW WATER" : "SUFFICIENT"}
-      </p>
-
-      <p className="text-center text-gray-400 text-sm mt-2">
-        Water Status
       </p>
     </div>
   )
 }
 
-function ChartCard({ title, children }) {
+function MonthlyGraph({
+  selectedMonth,
+  setSelectedMonth,
+  lowWaterAlertData,
+}) {
   return (
     <div className="card">
-      <h3 className="font-bold text-2xl mb-4">{title}</h3>
-      {children}
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-bold text-2xl">
+          Monthly Low Water Alerts
+        </h3>
+
+        <select
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(Number(e.target.value))}
+          className="bg-[#1e293b] border border-gray-700 rounded-lg px-3 py-2 text-sm"
+        >
+          <option value={0}>January</option>
+          <option value={1}>February</option>
+          <option value={2}>March</option>
+          <option value={3}>April</option>
+          <option value={4}>May</option>
+          <option value={5}>June</option>
+          <option value={6}>July</option>
+          <option value={7}>August</option>
+          <option value={8}>September</option>
+          <option value={9}>October</option>
+          <option value={10}>November</option>
+          <option value={11}>December</option>
+        </select>
+      </div>
+
+      <Bar data={lowWaterAlertData} options={chartOptions} />
     </div>
   )
 }
