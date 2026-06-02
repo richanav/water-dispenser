@@ -167,6 +167,50 @@ app.get("/", (req, res) => {
         "Server Running"
     );
 });
+/* DELIVERY REQUEST ROUTE */
+
+app.post("/request-delivery", async (req, res) => {
+
+    try {
+
+        const {
+            customerName,
+            customerPhone,
+            deviceId
+        } = req.body;
+
+        const vendorNumber = "919745554888";
+
+        const message =
+`🚚 DELIVERY REQUEST
+
+Customer: ${customerName}
+Phone: ${customerPhone}
+Device: ${deviceId}
+
+Customer has requested a water can delivery.`;
+
+        await sock.sendMessage(
+            vendorNumber + "@s.whatsapp.net",
+            { text: message }
+        );
+
+        res.json({
+            success: true,
+            message: "Vendor notified successfully"
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to notify vendor"
+        });
+    }
+});
+
 
 /* MAIN ROUTE */
 
@@ -246,6 +290,31 @@ app.post(
                 "✅ Firebase Updated"
             );
 
+
+             /* STORE LOW WATER ALERT */
+
+            if (currentLevel === "low") {
+
+            await db
+            .collection("low_water_alerts")
+            .add({
+
+            device_id:
+                data.device_id,
+
+            water_level:
+                currentLevel,
+
+            createdAt:
+                new Date()
+
+            });
+
+            console.log(
+              "✅ Low water alert stored"
+            );
+            }
+
             /* ==========================
                STATE CHANGE DETECTION
                ==========================
@@ -275,7 +344,7 @@ app.post(
                 try {
 
                     const upiId =
-                        "richaroy495@oksbi";
+                        "acd@oksbi";
 
                     const payeeName =
                         "Water Vendor";
@@ -392,6 +461,7 @@ Amount: ₹${amount}`
         }
     }
 );
+
 /* START SERVER */
 
 app.listen(3000, "0.0.0.0", () => {

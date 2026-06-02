@@ -211,18 +211,29 @@ useEffect(() => {
 
               {/* DELIVERY */}
               <div className="bg-gradient-to-br from-blue-700 via-indigo-800 to-slate-900 rounded-2xl p-5 border border-blue-900 shadow-xl hover:-translate-y-1 transition">
-                <h3 className="font-bold text-2xl">
-                  Need Delivery?
-                </h3>
+                <h3 className="font-bold text-2xl">Need Delivery?</h3>
 
                 <p className="text-sm text-gray-300 mt-2">
                   Request water can delivery instantly.
                 </p>
 
-                <button className="mt-4 bg-blue-500 hover:bg-blue-400 px-4 py-2 rounded-xl text-sm transition">
+                <button
+                  className="mt-4 bg-blue-500 hover:bg-blue-400 px-4 py-2 rounded-xl text-sm transition"
+                  onClick={requestDelivery}
+                >
                   Request Delivery
                 </button>
-                
+                const requestDelivery = async () => {
+                  await fetch("http://YOUR_SERVER_IP:3000/request-delivery", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      customerName: "Richa",
+                      customerPhone: "9876543210",
+                      deviceId: "ESP32_001",
+                    }),
+                  });
+                };
               </div>
 
             </div>
