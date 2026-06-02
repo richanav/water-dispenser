@@ -24,63 +24,55 @@ ChartJS.register(
 )
 
 function App() {
-
   const [alertCounts, setAlertCounts] = useState([0, 0, 0, 0])
-  const totalAlerts = alertCounts.reduce((sum, count) => sum + count, 0)
-  const averageAlerts = (totalAlerts / 4).toFixed(1)
-  const [currentStatus, setCurrentStatus] = useState("SUFFICIENT")
   const [tanks, setTanks] = useState([])
   const [activePage, setActivePage] = useState("dashboard")
 
-useEffect(() => {
-  const unsubscribe = onSnapshot(
-    collection(db, "low_water_alerts"),
-    (snapshot) => {
-      const weekCounts = [0, 0, 0, 0]
+  const totalAlerts = alertCounts.reduce((sum, count) => sum + count, 0)
+  const averageAlerts = (totalAlerts / 4).toFixed(1)
 
-      snapshot.docs.forEach((doc) => {
-        const data = doc.data()
-        const date = data.createdAt?.toDate?.()
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, "low_water_alerts"),
+      (snapshot) => {
+        const weekCounts = [0, 0, 0, 0]
 
-        if (date) {
-          const day = date.getDate()
-          const week = Math.min(Math.ceil(day / 7), 4)
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data()
+          const date = data.createdAt?.toDate?.()
 
-          weekCounts[week - 1]++
-        }
-      })
+          if (date) {
+            const day = date.getDate()
+            const week = Math.min(Math.ceil(day / 7), 4)
+            weekCounts[week - 1]++
+          }
+        })
 
-      setAlertCounts(weekCounts)
-    }
-  )
+        setAlertCounts(weekCounts)
+      }
+    )
 
-  return () => unsubscribe()
-}, [])
+    return () => unsubscribe()
+  }, [])
 
-useEffect(() => {
-  const unsubscribe = onSnapshot(
-    collection(db, "devices"),
-    (snapshot) => {
-      const tankList = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, "devices"),
+      (snapshot) => {
+        const tankList = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
 
-      setTanks(tankList)
-    }
-  )
+        setTanks(tankList)
+      }
+    )
 
-  return () => unsubscribe()
-}, [])  
+    return () => unsubscribe()
+  }, [])
 
   const lowWaterAlertData = {
-    labels: [
-      "Week 1",
-      "Week 2",
-      "Week 3",
-      "Week 4",
-    ],
-
+    labels: ["Week 1", "Week 2", "Week 3", "Week 4"],
     datasets: [
       {
         label: "Low Water Alerts",
@@ -91,14 +83,10 @@ useEffect(() => {
     ],
   }
 
-  
-
-
   return (
     <div className="min-h-screen bg-[#0b1120] text-white">
       <div className="flex">
 
-        {/* SIDEBAR */}
         <div className="w-[250px] min-h-screen bg-[#0f172a] border-r border-gray-800 p-6">
           <h1 className="text-3xl font-bold text-blue-400 mb-10">
             AquaAlert
@@ -116,75 +104,114 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* MAIN */}
         <div className="flex-1 p-6">
 
-          {/* TOP NAVBAR */}
-          <TopNavbar />
+          {activePage === "dashboard" && (
+            <>
+              <TopNavbar />
 
-          {/* TOP STATS */}
-    {activePage === "dashboard" && (
-  <>
-    {/* your current dashboard content */}
-  </>
-)}      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-            <StatCard
-            title="Tanks Monitored"
-            value={tanks.length}
-            sub="Active"
-            badge="Online"
-            />
+              <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+                <StatCard
+                  title="Tanks Monitored"
+                  value={tanks.length}
+                  sub="Active"
+                  badge="Online"
+                />
 
-            <StatCard
-              title="Low Water Alerts"
-              value="2"
-              sub="This Month"
-              badge="Normal"
-            />
+                <StatCard
+                  title="Low Water Alerts"
+                  value={totalAlerts}
+                  sub="This Month"
+                  badge="Normal"
+                />
 
-            <StatCard
-            title="Average Low Alerts"
-            value={averageAlerts}
-            sub="Per Week"
-            badge="Avg"
-            />
+                <StatCard
+                  title="Average Low Alerts"
+                  value={averageAlerts}
+                  sub="Per Week"
+                  badge="Avg"
+                />
 
-            <StatCard
-              title="Next Delivery"
-              value="Today 2 PM"
-              sub="Refill Pending"
-              badge="Pending"
-              gradient
-            />
+                <StatCard
+                  title="Next Delivery"
+                  value="Today 2 PM"
+                  sub="Refill Pending"
+                  badge="Pending"
+                  gradient
+                />
+              </section>
 
-            <StatCard
-              title="Wallet Balance"
-              value="₹1250"
-              sub="Available"
-              badge="Active"
-            />
-          </section>
+              <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2 space-y-6">
+                  <div className="card">
+                    <div className="flex justify-between mb-4">
+                      <h3 className="font-bold text-2xl">My Tank</h3>
 
-          {/* CONTENT */}
-          <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                      <button
+                        onClick={() => setActivePage("tank")}
+                        className="text-blue-400 text-sm"
+                      >
+                        View Details
+                      </button>
+                    </div>
 
-            {/* LEFT */}
-            <div className="xl:col-span-2 space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {tanks.map((tank) => {
+                        const status = String(tank.water_level).toLowerCase()
+                        const isLow = status === "low"
 
-              {/* TANK */}
-              <div className="card">
-                <div className="flex justify-between mb-4">
-                  <h3 className="font-bold text-2xl">
-                    My Tank
-                  </h3>
+                        return (
+                          <TankCard
+                            key={tank.id}
+                            name={tank.device_id || tank.id}
+                            status={isLow ? "LOW WATER" : "SUFFICIENT"}
+                            danger={isLow}
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
 
-                  <button className="text-blue-400 text-sm">
-                    View Details
-                  </button>
+                  <ChartCard title="Monthly Low Water Alerts">
+                    <Bar data={lowWaterAlertData} options={chartOptions} />
+                  </ChartCard>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {tanks.map((tank) => {
+                <div className="space-y-6">
+                  <div className="card">
+                    <h3 className="font-bold text-2xl mb-4">
+                      Recent Activity
+                    </h3>
+
+                    <Activity priority="normal" text="Tank monitoring active" time="10:30 AM" />
+                    <Activity priority="normal" text="Water level normal" time="10:35 AM" />
+                    <Activity priority="warning" text="Low water detected" time="11:10 AM" />
+                  </div>
+
+                  <div className="bg-gradient-to-br from-blue-700 via-indigo-800 to-slate-900 rounded-2xl p-5 border border-blue-900 shadow-xl hover:-translate-y-1 transition">
+                    <h3 className="font-bold text-2xl">Need Delivery?</h3>
+
+                    <p className="text-sm text-gray-300 mt-2">
+                      Request water can delivery instantly.
+                    </p>
+
+                    <button className="mt-4 bg-blue-500 hover:bg-blue-400 px-4 py-2 rounded-xl text-sm transition">
+                      Request Delivery
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+
+          {activePage === "tank" && (
+            <div>
+              <h1 className="text-4xl font-bold mb-6">
+                My Tank Details
+              </h1>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {tanks.map((tank) => {
                   const status = String(tank.water_level).toLowerCase()
                   const isLow = status === "low"
 
@@ -197,66 +224,16 @@ useEffect(() => {
                     />
                   )
                 })}
-                </div>
               </div>
-
-              {/* ALERT GRAPH */}
-              <ChartCard title="Monthly Low Water Alerts">
-                <Bar
-                  data={lowWaterAlertData}
-                  options={chartOptions}
-                />
-              </ChartCard>
-
             </div>
+          )}
 
-            {/* RIGHT */}
-            <div className="space-y-6">
-
-              {/* ACTIVITY */}
-              <div className="card">
-                <h3 className="font-bold text-2xl mb-4">
-                  Recent Activity
-                </h3>
-
-                <Activity
-                  priority="normal"
-                  text="Tank 1 is online"
-                  time="10:30 AM"
-                />
-
-                <Activity
-                  priority="normal"
-                  text="Water level normal"
-                  time="10:35 AM"
-                />
-
-                <Activity
-                  priority="warning"
-                  text="Low water detected"
-                  time="11:10 AM"
-                />
-              </div>
-
-              {/* DELIVERY */}
-              <div className="bg-gradient-to-br from-blue-700 via-indigo-800 to-slate-900 rounded-2xl p-5 border border-blue-900 shadow-xl hover:-translate-y-1 transition">
-                <h3 className="font-bold text-2xl">
-                  Need Delivery?
-                </h3>
-
-                <p className="text-sm text-gray-300 mt-2">
-                  Request water can delivery instantly.
-                </p>
-
-                <button className="mt-4 bg-blue-500 hover:bg-blue-400 px-4 py-2 rounded-xl text-sm transition">
-                  Request Delivery
-                </button>
-                
-              </div>
-
-            </div>
-
-          </section>
+          {activePage === "deliveries" && <Page title="Deliveries" />}
+          {activePage === "wallet" && <Page title="Wallet & Payments" />}
+          {activePage === "transactions" && <Page title="Transactions" />}
+          {activePage === "invoices" && <Page title="Invoices" />}
+          {activePage === "alerts" && <Page title="Alerts" />}
+          {activePage === "reports" && <Page title="Reports" />}
 
         </div>
       </div>
@@ -264,57 +241,40 @@ useEffect(() => {
   )
 }
 
-/* TOP NAVBAR */
 function TopNavbar() {
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-
       <div>
-        <h2 className="text-5xl font-bold">
-          Dashboard
-        </h2>
-
-        <p className="text-gray-400 text-lg">
-          Welcome back 👋
-        </p>
+        <h2 className="text-5xl font-bold">Dashboard</h2>
+        <p className="text-gray-400 text-lg">Welcome back 👋</p>
       </div>
 
       <div className="flex items-center gap-4">
-
-        {/* SEARCH */}
         <div className="hidden sm:flex items-center bg-[#1e293b] px-4 py-2 rounded-xl border border-gray-800">
           <FiSearch className="text-gray-400 mr-2" />
-
           <input
             className="bg-transparent outline-none text-sm text-white placeholder-gray-500"
             placeholder="Search..."
           />
         </div>
 
-        {/* BELL */}
         <button className="relative bg-[#1e293b] p-3 rounded-xl border border-gray-800">
           <FiBell />
-
           <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
         </button>
 
-        {/* PROFILE */}
         <div className="flex items-center gap-2 bg-[#1e293b] px-3 py-2 rounded-xl border border-gray-800">
           <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
             <FiUser />
           </div>
 
-          <span className="text-sm">
-            Admin
-          </span>
+          <span className="text-sm">Admin</span>
         </div>
-
       </div>
     </div>
   )
 }
 
-/* MENU */
 function MenuItem({ text, active, onClick }) {
   return (
     <div
@@ -330,15 +290,7 @@ function MenuItem({ text, active, onClick }) {
   )
 }
 
-/* STAT CARD */
-function StatCard({
-  title,
-  value,
-  sub,
-  danger,
-  badge,
-  gradient,
-}) {
+function StatCard({ title, value, sub, danger, badge, gradient }) {
   return (
     <div
       className={`rounded-2xl p-5 border border-gray-800 shadow-xl hover:-translate-y-1 transition ${
@@ -348,10 +300,7 @@ function StatCard({
       }`}
     >
       <div className="flex justify-between items-start">
-
-        <p className="text-sm text-gray-400">
-          {title}
-        </p>
+        <p className="text-sm text-gray-400">{title}</p>
 
         <span
           className={`text-xs px-2 py-1 rounded-full ${
@@ -362,27 +311,21 @@ function StatCard({
         >
           {badge}
         </span>
-
       </div>
 
       <h3
         className={`text-4xl font-bold mt-3 ${
-          danger
-            ? "text-red-400"
-            : "text-white"
+          danger ? "text-red-400" : "text-white"
         }`}
       >
         {value}
       </h3>
 
-      <p className="text-xs text-gray-500 mt-1">
-        {sub}
-      </p>
+      <p className="text-xs text-gray-500 mt-1">{sub}</p>
     </div>
   )
 }
 
-/* TANK CARD */
 function TankCard({ name, status, danger }) {
   return (
     <div
@@ -393,9 +336,7 @@ function TankCard({ name, status, danger }) {
       }`}
     >
       <div className="flex justify-between items-center gap-3">
-        <h4 className="font-semibold text-xl">
-          {name}
-        </h4>
+        <h4 className="font-semibold text-xl">{name}</h4>
 
         <span
           className={`text-xs px-3 py-2 rounded-full ${
@@ -412,9 +353,7 @@ function TankCard({ name, status, danger }) {
         <div className="w-32 h-44 border-2 border-blue-400 rounded-b-2xl rounded-t-lg relative overflow-hidden bg-[#0f172a]">
           <div
             className={`absolute bottom-0 w-full transition-all duration-500 ${
-              danger
-                ? "bg-red-500 h-[25%]"
-                : "bg-blue-500 h-[75%]"
+              danger ? "bg-red-500 h-[25%]" : "bg-blue-500 h-[75%]"
             }`}
           ></div>
         </div>
@@ -435,25 +374,16 @@ function TankCard({ name, status, danger }) {
   )
 }
 
-/* CHART CARD */
 function ChartCard({ title, children }) {
   return (
     <div className="card">
-      <h3 className="font-bold text-2xl mb-4">
-        {title}
-      </h3>
-
+      <h3 className="font-bold text-2xl mb-4">{title}</h3>
       {children}
     </div>
   )
 }
 
-/* ACTIVITY */
-function Activity({
-  text,
-  time,
-  priority,
-}) {
+function Activity({ text, time, priority }) {
   const color =
     priority === "critical"
       ? "bg-red-500"
@@ -463,25 +393,27 @@ function Activity({
 
   return (
     <div className="flex justify-between items-center border-b border-gray-700 py-4 text-sm">
-
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full ${color}`}></span>
-
-        <p className="text-gray-300">
-          {text}
-        </p>
+        <p className="text-gray-300">{text}</p>
       </div>
 
-      <p className="text-gray-500">
-        {time}
-      </p>
-
+      <p className="text-gray-500">{time}</p>
     </div>
   )
 }
 
+function Page({ title }) {
+  return (
+    <div className="card">
+      <h1 className="text-3xl font-bold">{title}</h1>
+      <p className="text-gray-400 mt-4">
+        This page can be updated with details later.
+      </p>
+    </div>
+  )
+}
 
-/* CHART OPTIONS */
 const chartOptions = {
   responsive: true,
 
