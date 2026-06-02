@@ -170,7 +170,7 @@ app.get("/", (req, res) => {
 /* DELIVERY REQUEST ROUTE */
 
 app.post("/request-delivery", async (req, res) => {
-
+  console.log("🚚 Delivery request received");
     try {
 
         const {
@@ -211,8 +211,6 @@ Customer has requested a water can delivery.`;
     }
 });
 
-
-/* MAIN ROUTE */
 
 /* MAIN ROUTE */
 
