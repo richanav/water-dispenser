@@ -167,8 +167,50 @@ app.get("/", (req, res) => {
         "Server Running"
     );
 });
+/* DELIVERY REQUEST ROUTE */
 
-/* MAIN ROUTE */
+app.post("/request-delivery", async (req, res) => {
+  console.log("🚚 Delivery request received");
+    try {
+
+        const {
+            customerName,
+            customerPhone,
+            deviceId
+        } = req.body;
+
+        const vendorNumber = "919745554888";
+
+        const message =
+`🚚 DELIVERY REQUEST
+
+Customer: ${customerName}
+Phone: ${customerPhone}
+Device: ${deviceId}
+
+Customer has requested a water can delivery.`;
+
+        await sock.sendMessage(
+            vendorNumber + "@s.whatsapp.net",
+            { text: message }
+        );
+
+        res.json({
+            success: true,
+            message: "Vendor notified successfully"
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to notify vendor"
+        });
+    }
+});
+
 
 /* MAIN ROUTE */
 
@@ -417,6 +459,7 @@ Amount: ₹${amount}`
         }
     }
 );
+
 /* START SERVER */
 
 app.listen(3000, "0.0.0.0", () => {

@@ -88,7 +88,25 @@ function App() {
       },
     ],
   }
+const requestDelivery = async () => {
+   console.log("Button clicked");
 
+    await fetch(
+        "http://192.168.1.53:3000/request-delivery",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type":
+                    "application/json"
+            },
+            body: JSON.stringify({
+                 customerName: "Richa",
+                 customerPhone: "9745554888",
+                 deviceId: "water_device_20"
+        })
+      }
+    );
+};
   return (
     <div className="min-h-screen bg-[#0b1120] text-white">
       <div className="flex">
@@ -239,7 +257,9 @@ function App() {
                       Request water can delivery instantly.
                     </p>
 
-                    <button className="mt-4 bg-blue-500 hover:bg-blue-400 px-4 py-2 rounded-xl text-sm transition">
+                    <button 
+                      className="mt-4 bg-blue-500 hover:bg-blue-400 px-4 py-2 rounded-xl text-sm transition"
+                      onClick={requestDelivery}>
                       Request Delivery
                     </button>
                   </div>
@@ -294,6 +314,7 @@ function App() {
       </div>
     </div>
   )
+
 }
 
 function TopNavbar() {
