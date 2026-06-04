@@ -34,7 +34,6 @@ function App() {
     deliveries: "Deliveries",
     wallet: "Wallet & Payments",
     transactions: "Transactions",
-    invoices: "Invoices",
     alerts: "Alerts",
     graph: "Graph",
   }
@@ -58,10 +57,7 @@ function App() {
       } else if (value.includes("transaction")) {
         setActivePage("transactions")
         setNotFound(false)
-      } else if (value.includes("invoice")) {
-        setActivePage("invoices")
-        setNotFound(false)
-      } else if (value.includes("alert")) {
+      }else if (value.includes("alert")) {
         setActivePage("alerts")
         setNotFound(false)
       } else if (value.includes("graph")) {
@@ -152,7 +148,6 @@ function App() {
             <MenuItem text="Deliveries" active={activePage === "deliveries"} onClick={() => setActivePage("deliveries")} />
             <MenuItem text="Wallet & Payments" active={activePage === "wallet"} onClick={() => setActivePage("wallet")} />
             <MenuItem text="Transactions" active={activePage === "transactions"} onClick={() => setActivePage("transactions")} />
-            <MenuItem text="Invoices" active={activePage === "invoices"} onClick={() => setActivePage("invoices")} />
             <MenuItem text="Alerts" active={activePage === "alerts"} onClick={() => setActivePage("alerts")} />
             <MenuItem text="Graph" active={activePage === "graph"} onClick={() => setActivePage("graph")} />
           </div>
@@ -287,7 +282,6 @@ function App() {
           {activePage === "deliveries" && <DeliveriesPage />}
           {activePage === "wallet" && <Page title="Wallet & Payments" />}
           {activePage === "transactions" && <Page title="Transactions" />}
-          {activePage === "invoices" && <Page title="Invoices" />}
           {activePage === "alerts" && <Page title="Alerts" />}
         </div>
       </div>
