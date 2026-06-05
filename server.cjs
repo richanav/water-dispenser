@@ -41,6 +41,94 @@ app.use(express.json());
 
 let sock;
 
+
+const VENDOR_NUMBER =
+    "918105730925@s.whatsapp.net";
+
+function generateInvoice(order) {
+
+    return `
+WATER HAS BEEN REFILLED
+🧾 PAYMENT INVOICE
+
+Invoice No:
+INV-${order.orderId}
+
+Order ID:
+${order.orderId}
+
+Customer:
+${order.customerName}
+
+Device:
+${order.deviceId}
+
+Amount:
+₹${order.amount}
+
+Status:
+Delivered`
+}
+
+function generateUPILink(order) {
+
+    const upiId = "acd@oksbi";
+
+    const payeeName =
+        "Water Vendor";
+
+    return (
+        `upi://pay?pa=${upiId}` +
+        `&pn=${encodeURIComponent(payeeName)}` +
+        `&am=${order.amount}` +
+        `&cu=INR` +
+        `&tn=${encodeURIComponent(order.orderId)}`
+    );
+}
+
+async function sendInvoiceToCustomer(
+    order
+) {
+
+    const invoice =
+        generateInvoice(order);
+
+    const upiLink =
+        generateUPILink(order);
+
+    const qrBuffer =
+        await QRCode.toBuffer(
+            upiLink
+        );
+
+    const customerPhone =
+    String(order.customerPhone);
+
+const customerJid =
+    customerPhone.startsWith("91")
+        ? customerPhone +
+          "@s.whatsapp.net"
+        : "91" +
+          customerPhone +
+          "@s.whatsapp.net";
+
+    await sock.sendMessage(
+    customerJid,
+    {
+        text: invoice
+    }
+    );
+
+    await sock.sendMessage(
+        customerJid,
+        { 
+            image: qrBuffer,
+
+            caption:
+`💳 Please pay ₹${order.amount}`
+        }
+    );
+}
 /* WHATSAPP CONNECTION */
 
 async function connectToWhatsApp() {
@@ -62,7 +150,7 @@ async function connectToWhatsApp() {
         auth: state,
         printQRInTerminal: false
     });
-
+   
     sock.ev.on(
         "connection.update",
 
@@ -94,31 +182,9 @@ async function connectToWhatsApp() {
                 console.log(
                     "\n✅ WhatsApp Connected\n"
                 );
+                
 
-                try {
-
-                    await sock.sendMessage(
-                        "919745554888@s.whatsapp.net",
-                        {
-                            text:
-                                "✅ Test message from server"
-                        }
-                    );
-
-                    console.log(
-                        "✅ Test message sent"
-                    );
-
-                } catch (err) {
-
-                    console.log(
-                        "❌ Test message failed"
-                    );
-
-                    console.log(err);
-                }
-            }
-
+            } 
             /* DISCONNECTED */
 
             else if (
@@ -169,47 +235,95 @@ app.get("/", (req, res) => {
 });
 /* DELIVERY REQUEST ROUTE */
 
-app.post("/request-delivery", async (req, res) => {
-  console.log("🚚 Delivery request received");
-    try {
+app.post(
+    "/request-delivery",
 
-        const {
-            customerName,
-            customerPhone,
-            deviceId
-        } = req.body;
+    async (req, res) => {
 
-        const vendorNumber = "919745554888";
+        try {
 
-        const message =
+            const {
+                customerName,
+                customerPhone,
+                deviceId
+            } = req.body;
+
+            const orderId =
+                "ORD-" +
+                Date.now();
+
+            await db
+                .collection(
+                    "orders"
+                )
+                .doc(orderId)
+                .set({
+
+                    orderId,
+
+                    customerName,
+
+                    customerPhone,
+
+                    deviceId,
+
+                    amount: 50,
+
+                    status:
+                        "PENDING",
+
+                    createdAt:
+                        Date.now()
+                });
+
+            const message =
 `🚚 DELIVERY REQUEST
 
-Customer: ${customerName}
-Phone: ${customerPhone}
-Device: ${deviceId}
+Order ID:
+${orderId}
 
-Customer has requested a water can delivery.`;
+Customer:
+${customerName}
 
-        await sock.sendMessage(
-            vendorNumber + "@s.whatsapp.net",
-            { text: message }
-        );
+Phone:
+${customerPhone}
 
-        res.json({
-            success: true,
-            message: "Vendor notified successfully"
-        });
+Device:
+${deviceId}
 
-    } catch (err) {
+Reply:
 
-        console.error(err);
+DONE ${orderId}`;
 
-        res.status(500).json({
-            success: false,
-            message: "Failed to notify vendor"
-        });
+            await sock.sendMessage(
+                VENDOR_NUMBER,
+                {
+                    text:
+                        message
+                }
+            );
+
+            res.json({
+
+                success: true,
+
+                orderId
+            });
+
+        } catch (err) {
+
+            console.error(
+                err
+            );
+
+            res.status(500)
+                .json({
+
+                success: false
+            });
+        }
     }
-});
+);
 
 
 /* MAIN ROUTE */
@@ -282,7 +396,7 @@ app.post(
                 timestamp:
                     Date.now()
 
-            });
+            }, { merge: true });
 
             console.log(
                 "✅ Firebase Updated"
@@ -329,116 +443,222 @@ app.post(
                HIGH -> HIGH
                Do Nothing
             */
+           console.log("previousLevel =", previousLevel);
+           console.log("currentLevel =", currentLevel);
+           if (
+    previousLevel === "high" &&
+    currentLevel === "low"
+) {
 
-            if (
-                previousLevel === "high" &&
-                currentLevel === "low"
-            ) {
+    console.log(
+        "🚨 HIGH -> LOW detected"
+    );
+    const existingOrders =
+    await db
+        .collection("orders")
+        .where(
+            "deviceId",
+            "==",
+            data.device_id
+        )
+        .where(
+            "status",
+            "==",
+            "PENDING"
+        )
+        .get();
 
-                console.log(
-                    "🚨 HIGH -> LOW detected"
-                );
+if (!existingOrders.empty) {
 
-                try {
+    console.log(
+        "Pending order already exists"
+    );
 
-                    const upiId =
-                        "acd@oksbi";
+    return;
+}
+    try {
 
-                    const payeeName =
-                        "Water Vendor";
+        const latestDeviceDoc =
+            await deviceRef.get();
 
-                    const amount =
-                        "1";
+        const deviceData =
+            latestDeviceDoc.data();
+            console.log("Device Data:", deviceData);
+        if (
+            !deviceData.customerPhone
+        ) {
 
-                    const note =
-                        `Refill for ${data.device_id}`;
+            console.log(
+                "❌ No customer phone found"
+            );
 
-                    const upiLink =
-                        `upi://pay?pa=${upiId}` +
-                        `&pn=${encodeURIComponent(
-                            payeeName
-                        )}` +
-                        `&am=${amount}` +
-                        `&cu=INR` +
-                        `&tn=${encodeURIComponent(
-                            note
-                        )}`;
+            return;
+        }
+        console.log("Creating order...");
+        const orderId =
+            "ORD-" + Date.now();
 
-                    const qrPath =
-                        `./upi-${data.device_id}.png`;
+        const order = {
 
-                    await QRCode.toFile(
-                        qrPath,
-                        upiLink
-                    );
+            orderId,
 
-                    console.log(
-                        "✅ QR Generated"
-                    );
+            deviceId:
+                data.device_id,
 
-                    await sock.sendMessage(
-                        "919745554888@s.whatsapp.net",
-                        {
-                            image:
-                                fs.readFileSync(
-                                    qrPath
-                                ),
+            customerName:
+                deviceData.customerName,
 
-                            caption:
-`🚨 Water dispenser EMPTY
+            customerPhone:
+                deviceData.customerPhone,
+                
 
-💳 Scan QR to Pay
+            amount: 100,
 
-Amount: ₹${amount}`
-                        }
-                    );
+            status:
+                "PENDING",
 
-                    console.log(
-                        "✅ WhatsApp QR sent"
-                    );
+            createdAt:
+                Date.now()
+        };
 
-                } catch (err) {
+        await db
+            .collection("orders")
+            .doc(orderId)
+            .set(order);
 
-                    console.log(
-                        "❌ WhatsApp Error"
-                    );
+        console.log(
+            "✅ Order Created"
+        );
+        
+        const vendorMessage =
+`🚚 NEW DELIVERY REQUEST
 
-                    console.log(err);
-                }
+Order ID:
+${orderId}
+
+Customer:
+${order.customerName}
+
+Phone:
+${order.customerPhone}
+
+Device:
+${order.deviceId}`;
+
+        await sock.sendMessage(
+            VENDOR_NUMBER,
+            {
+                text:
+                    vendorMessage
             }
+        );
+        const customerPhone = String(deviceData.customerPhone);
+
+        const customerJid =
+        customerPhone.startsWith("91")
+        ? customerPhone + "@s.whatsapp.net"
+        : "91" + customerPhone + "@s.whatsapp.net";
+        await sock.sendMessage(
+            customerJid,
+            {
+                text: `🚨 WATER LEVEL LOW,A DELIVERY REQUEST HAS BEEN SENT TO VENDOR.`
+            }
+        );
+        console.log(
+            "✅ Vendor notified"
+        );
+
+    } catch (err) {
+
+        console.log(err);
+    }
+}
+            
 
             else if (
-                previousLevel === "low" &&
-                currentLevel === "high"
-            ) {
+    previousLevel === "low" &&
+    currentLevel === "high"
+)
+{
+    console.log(
+        "✅ LOW -> HIGH detected"
+    );
 
-                console.log(
-                    "✅ LOW -> HIGH detected"
-                );
+    try {
 
-                try {
+        const pendingOrders =
+            await db
+                .collection("orders")
+                .where(
+                    "deviceId",
+                    "==",
+                    data.device_id
+                )
+                .where(
+                    "status",
+                    "==",
+                    "PENDING"
+                )
+                .limit(1)
+                .get();
 
-                    await sock.sendMessage(
-                        "919745554888@s.whatsapp.net",
-                        {
-                            text:
-                                "✅ Water dispenser REFILLED"
-                        }
-                    );
+        if (
+            pendingOrders.empty
+        ) {
 
-                    console.log(
-                        "✅ Refill message sent"
-                    );
+            console.log(
+                "No pending orders found"
+            );
 
-                } catch (err) {
+        } else {
 
-                    console.log(
-                        "❌ WhatsApp Error"
-                    );
+            const orderDoc =
+                pendingOrders.docs[0];
 
-                    console.log(err);
+            const order =
+                orderDoc.data();
+
+            await orderDoc.ref.update({
+
+                status:
+                    "DELIVERED",
+
+                deliveredAt:
+                    Date.now()
+            });
+
+            console.log(
+                "✅ Order marked DELIVERED"
+            );
+
+            await sendInvoiceToCustomer(
+                order
+            );
+
+            console.log(
+                "✅ Invoice sent"
+            );
+
+            await sock.sendMessage(
+                VENDOR_NUMBER,
+                {
+                    text:
+`✅ Order Completed
+
+Order:
+${order.orderId}
+
+Invoice Sent To Customer`
                 }
-            }
+            );
+        }
+
+    } catch (err) {
+
+        console.log(err);
+    }
+}
+            
 
             else {
 
@@ -450,13 +670,12 @@ Amount: ₹${amount}`
             res.send(
                 "Data stored successfully"
             );
-
-        } catch (error) {
+        }catch (error) {
 
             console.error(error);
 
             res.status(500).send(error);
-        }
+        } 
     }
 );
 
