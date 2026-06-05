@@ -15,22 +15,59 @@ import {
 
 import { Bar } from "react-chartjs-2"
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Tooltip,
-  Legend
-)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 
 function App() {
   const [alertCounts, setAlertCounts] = useState([0, 0, 0, 0])
   const [tanks, setTanks] = useState([])
+  const [searchText, setSearchText] = useState("")
+  const [notFound, setNotFound] = useState(false)
   const [activePage, setActivePage] = useState("dashboard")
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
 
   const totalAlerts = alertCounts.reduce((sum, count) => sum + count, 0)
   const averageAlerts = (totalAlerts / 4).toFixed(1)
+
+  const pageTitles = {
+    dashboard: "Dashboard",
+    tank: "My Tank",
+    deliveries: "Deliveries",
+    wallet: "Wallet & Payments",
+    transactions: "Transactions",
+    alerts: "Alerts",
+    graph: "Graph",
+  }
+
+  const handleSearch = (e) => {
+    if (e.key === "Enter") {
+      const value = searchText.toLowerCase().trim()
+
+      if (value.includes("dashboard")) {
+        setActivePage("dashboard")
+        setNotFound(false)
+      } else if (value.includes("tank")) {
+        setActivePage("tank")
+        setNotFound(false)
+      } else if (value.includes("deliver")) {
+        setActivePage("deliveries")
+        setNotFound(false)
+      } else if (value.includes("wallet") || value.includes("payment")) {
+        setActivePage("wallet")
+        setNotFound(false)
+      } else if (value.includes("transaction")) {
+        setActivePage("transactions")
+        setNotFound(false)
+      }else if (value.includes("alert")) {
+        setActivePage("alerts")
+        setNotFound(false)
+      } else if (value.includes("graph")) {
+        setActivePage("graph")
+        setNotFound(false)
+      } else {
+        setNotFound(true)
+      }
+    }
+  }
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -42,15 +79,10 @@ function App() {
           const data = doc.data()
           const date = data.createdAt?.toDate?.()
 
-          if (date) {
-            const alertMonth = date.getMonth()
-
-            if (alertMonth === selectedMonth) {
-              const day = date.getDate()
-              const week = Math.min(Math.ceil(day / 7), 4)
-
-              weekCounts[week - 1]++
-            }
+          if (date && date.getMonth() === selectedMonth) {
+            const day = date.getDate()
+            const week = Math.min(Math.ceil(day / 7), 4)
+            weekCounts[week - 1]++
           }
         })
 
@@ -62,17 +94,14 @@ function App() {
   }, [selectedMonth])
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, "devices"),
-      (snapshot) => {
-        const tankList = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
+    const unsubscribe = onSnapshot(collection(db, "devices"), (snapshot) => {
+      const tankList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
 
-        setTanks(tankList)
-      }
-    )
+      setTanks(tankList)
+    })
 
     return () => unsubscribe()
   }, [])
@@ -88,25 +117,23 @@ function App() {
       },
     ],
   }
-const requestDelivery = async () => {
-   console.log("Button clicked");
 
-    await fetch(
-        "http://192.168.1.53:3000/request-delivery",
-        {
-            method: "POST",
-            headers: {
-                "Content-Type":
-                    "application/json"
-            },
-            body: JSON.stringify({
-                 customerName: "Richa",
-                 customerPhone: "9745554888",
-                 deviceId: "water_device_20"
-        })
-      }
-    );
-};
+  const requestDelivery = async () => {
+    console.log("Button clicked")
+
+    await fetch("http://192.168.1.39:3000/request-delivery", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        customerName: "Richa",
+        customerPhone: "9745554888",
+        deviceId: "water_device_20",
+      }),
+    })
+  }
+
   return (
     <div className="min-h-screen bg-[#0b1120] text-white">
       <div className="flex">
@@ -116,90 +143,42 @@ const requestDelivery = async () => {
           </h1>
 
           <div className="space-y-4">
-            <MenuItem
-              text="Dashboard"
-              active={activePage === "dashboard"}
-              onClick={() => setActivePage("dashboard")}
-            />
-
-            <MenuItem
-              text="My Tank"
-              active={activePage === "tank"}
-              onClick={() => setActivePage("tank")}
-            />
-
-            <MenuItem
-              text="Deliveries"
-              active={activePage === "deliveries"}
-              onClick={() => setActivePage("deliveries")}
-            />
-
-            <MenuItem
-              text="Wallet & Payments"
-              active={activePage === "wallet"}
-              onClick={() => setActivePage("wallet")}
-            />
-
-            <MenuItem
-              text="Transactions"
-              active={activePage === "transactions"}
-              onClick={() => setActivePage("transactions")}
-            />
-
-            <MenuItem
-              text="Invoices"
-              active={activePage === "invoices"}
-              onClick={() => setActivePage("invoices")}
-            />
-
-            <MenuItem
-              text="Alerts"
-              active={activePage === "alerts"}
-              onClick={() => setActivePage("alerts")}
-            />
-
-            <MenuItem
-              text="Graph"
-              active={activePage === "graph"}
-              onClick={() => setActivePage("graph")}
-            />
+            <MenuItem text="Dashboard" active={activePage === "dashboard"} onClick={() => setActivePage("dashboard")} />
+            <MenuItem text="My Tank" active={activePage === "tank"} onClick={() => setActivePage("tank")} />
+            <MenuItem text="Deliveries" active={activePage === "deliveries"} onClick={() => setActivePage("deliveries")} />
+            <MenuItem text="Wallet & Payments" active={activePage === "wallet"} onClick={() => setActivePage("wallet")} />
+            <MenuItem text="Transactions" active={activePage === "transactions"} onClick={() => setActivePage("transactions")} />
+            <MenuItem text="Alerts" active={activePage === "alerts"} onClick={() => setActivePage("alerts")} />
+            <MenuItem text="Graph" active={activePage === "graph"} onClick={() => setActivePage("graph")} />
           </div>
         </div>
 
         <div className="flex-1 p-6">
+          <TopNavbar
+            title={pageTitles[activePage]}
+            searchText={searchText}
+            setSearchText={setSearchText}
+            handleSearch={handleSearch}
+          />
+
+          {notFound && (
+            <div className="card mb-6 border border-red-800 bg-red-950/30">
+              <h2 className="text-2xl font-bold text-red-400">
+                Page Not Found
+              </h2>
+              <p className="text-gray-400 mt-2">
+                No matching page found for "{searchText}".
+              </p>
+            </div>
+          )}
+
           {activePage === "dashboard" && (
             <>
-              <TopNavbar />
-
               <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-                <StatCard
-                  title="Tanks Monitored"
-                  value={tanks.length}
-                  sub="Active"
-                  badge="Online"
-                />
-
-                <StatCard
-                  title="Low Water Alerts"
-                  value={totalAlerts}
-                  sub="This Month"
-                  badge="Normal"
-                />
-
-                <StatCard
-                  title="Average Low Alerts"
-                  value={averageAlerts}
-                  sub="Per Week"
-                  badge="Avg"
-                />
-
-                <StatCard
-                  title="Next Delivery"
-                  value="Today 2 PM"
-                  sub="Refill Pending"
-                  badge="Pending"
-                  gradient
-                />
+                <StatCard title="Tanks Monitored" value={tanks.length} sub="Active" badge="Online" />
+                <StatCard title="Low Water Alerts" value={totalAlerts} sub="This Month" badge="Normal" />
+                <StatCard title="Average Low Alerts" value={averageAlerts} sub="Per Week" badge="Avg" />
+                <StatCard title="Next Delivery" value="Today 2 PM" sub="Refill Pending" badge="Pending" gradient />
               </section>
 
               <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -257,9 +236,10 @@ const requestDelivery = async () => {
                       Request water can delivery instantly.
                     </p>
 
-                    <button 
+                    <button
                       className="mt-4 bg-blue-500 hover:bg-blue-400 px-4 py-2 rounded-xl text-sm transition"
-                      onClick={requestDelivery}>
+                      onClick={requestDelivery}
+                    >
                       Request Delivery
                     </button>
                   </div>
@@ -270,9 +250,7 @@ const requestDelivery = async () => {
 
           {activePage === "tank" && (
             <div>
-              <h1 className="text-4xl font-bold mb-6">
-                My Tank Details
-              </h1>
+              <h1 className="text-4xl font-bold mb-6">My Tank Details</h1>
 
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {tanks.map((tank) => {
@@ -293,10 +271,6 @@ const requestDelivery = async () => {
 
           {activePage === "graph" && (
             <div>
-              <h1 className="text-4xl font-bold mb-6">
-                Graph
-              </h1>
-
               <MonthlyGraph
                 selectedMonth={selectedMonth}
                 setSelectedMonth={setSelectedMonth}
@@ -305,32 +279,34 @@ const requestDelivery = async () => {
             </div>
           )}
 
-          {activePage === "deliveries" && <Page title="Deliveries" />}
+          {activePage === "deliveries" && <DeliveriesPage />}
           {activePage === "wallet" && <Page title="Wallet & Payments" />}
           {activePage === "transactions" && <Page title="Transactions" />}
-          {activePage === "invoices" && <Page title="Invoices" />}
           {activePage === "alerts" && <Page title="Alerts" />}
         </div>
       </div>
     </div>
   )
-
 }
 
-function TopNavbar() {
+function TopNavbar({ title, searchText, setSearchText, handleSearch }) {
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
       <div>
-        <h2 className="text-5xl font-bold">Dashboard</h2>
+        <h2 className="text-5xl font-bold">{title}</h2>
         <p className="text-gray-400 text-lg">Welcome back 👋</p>
       </div>
 
       <div className="flex items-center gap-4">
         <div className="hidden sm:flex items-center bg-[#1e293b] px-4 py-2 rounded-xl border border-gray-800">
           <FiSearch className="text-gray-400 mr-2" />
+
           <input
             className="bg-transparent outline-none text-sm text-white placeholder-gray-500"
             placeholder="Search..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            onKeyDown={handleSearch}
           />
         </div>
 
@@ -348,6 +324,109 @@ function TopNavbar() {
         </div>
       </div>
     </div>
+  )
+}
+
+function DeliveriesPage() {
+  return (
+    <div className="space-y-6">
+      <div className="card">
+        <h1 className="text-3xl font-bold">Delivery Status</h1>
+        <p className="text-gray-400 mt-2">
+          Track your water can delivery in real time.
+        </p>
+
+        <div className="mt-8 max-w-3xl">
+          <DeliveryStep
+            status="done"
+            title="Ordered"
+            desc="Your water can delivery request has been placed."
+            time="10:30 AM"
+          />
+
+          <DeliveryLine active />
+
+          <DeliveryStep
+            status="done"
+            title="Confirmed"
+            desc="Vendor has accepted your delivery request."
+            time="10:35 AM"
+          />
+
+          <DeliveryLine active />
+
+          <DeliveryStep
+            status="current"
+            title="Out for Delivery"
+            desc="Your water can is on the way."
+            time="Expected: Today, 2:00 PM"
+          />
+
+          <DeliveryLine />
+
+          <DeliveryStep
+            status="pending"
+            title="Arriving Soon"
+            desc="Delivery person will reach your location shortly."
+            time="Pending"
+          />
+
+          <DeliveryLine />
+
+          <DeliveryStep
+            status="pending"
+            title="Arrived"
+            desc="Delivery will be completed once the can is delivered."
+            time="Pending"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DeliveryStep({ status, title, desc, time }) {
+  const isDone = status === "done"
+  const isCurrent = status === "current"
+
+  return (
+    <div className="flex items-center gap-5">
+      <div
+        className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 ${
+          isDone
+            ? "bg-green-600 border-green-600 text-white"
+            : isCurrent
+            ? "bg-blue-600 border-blue-600 text-white animate-pulse"
+            : "bg-[#111827] border-gray-600 text-gray-400"
+        }`}
+      >
+        {isDone ? "✓" : isCurrent ? "●" : "○"}
+      </div>
+
+      <div className="flex-1">
+        <h3
+          className={`text-xl font-bold ${
+            isCurrent ? "text-blue-400" : isDone ? "text-green-400" : "text-gray-300"
+          }`}
+        >
+          {title}
+        </h3>
+
+        <p className="text-gray-400 text-sm mt-1">{desc}</p>
+      </div>
+
+      <p className="text-sm text-gray-500">{time}</p>
+    </div>
+  )
+}
+
+function DeliveryLine({ active }) {
+  return (
+    <div
+      className={`w-[3px] h-12 ml-6 my-2 rounded-full ${
+        active ? "bg-green-500" : "bg-gray-700"
+      }`}
+    ></div>
   )
 }
 
@@ -370,9 +449,7 @@ function StatCard({ title, value, sub, danger, badge, gradient }) {
   return (
     <div
       className={`rounded-2xl p-5 border border-gray-800 shadow-xl hover:-translate-y-1 transition ${
-        gradient
-          ? "bg-gradient-to-br from-blue-700 to-purple-900"
-          : "bg-[#1e293b]"
+        gradient ? "bg-gradient-to-br from-blue-700 to-purple-900" : "bg-[#1e293b]"
       }`}
     >
       <div className="flex justify-between items-start">
@@ -380,20 +457,14 @@ function StatCard({ title, value, sub, danger, badge, gradient }) {
 
         <span
           className={`text-xs px-2 py-1 rounded-full ${
-            danger
-              ? "bg-red-900 text-red-300"
-              : "bg-green-900 text-green-300"
+            danger ? "bg-red-900 text-red-300" : "bg-green-900 text-green-300"
           }`}
         >
           {badge}
         </span>
       </div>
 
-      <h3
-        className={`text-4xl font-bold mt-3 ${
-          danger ? "text-red-400" : "text-white"
-        }`}
-      >
+      <h3 className={`text-4xl font-bold mt-3 ${danger ? "text-red-400" : "text-white"}`}>
         {value}
       </h3>
 
@@ -406,9 +477,7 @@ function TankCard({ name, danger }) {
   return (
     <div
       className={`w-full max-w-md rounded-2xl p-4 border hover:-translate-y-1 transition ${
-        danger
-          ? "bg-[#2a1a1a] border-red-800"
-          : "bg-[#111827] border-gray-800"
+        danger ? "bg-[#2a1a1a] border-red-800" : "bg-[#111827] border-gray-800"
       }`}
     >
       <div className="flex justify-between items-center gap-3">
@@ -431,28 +500,18 @@ function TankCard({ name, danger }) {
         </div>
       </div>
 
-      <p
-        className={`text-center font-bold text-3xl mt-4 ${
-          danger ? "text-red-400" : "text-green-400"
-        }`}
-      >
+      <p className={`text-center font-bold text-3xl mt-4 ${danger ? "text-red-400" : "text-green-400"}`}>
         {danger ? "LOW WATER" : "SUFFICIENT"}
       </p>
     </div>
   )
 }
 
-function MonthlyGraph({
-  selectedMonth,
-  setSelectedMonth,
-  lowWaterAlertData,
-}) {
+function MonthlyGraph({ selectedMonth, setSelectedMonth, lowWaterAlertData }) {
   return (
     <div className="card">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-2xl">
-          Monthly Low Water Alerts
-        </h3>
+        <h3 className="font-bold text-2xl">Monthly Low Water Alerts</h3>
 
         <select
           value={selectedMonth}
