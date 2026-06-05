@@ -1,7 +1,7 @@
 import { FiBell, FiSearch, FiUser } from "react-icons/fi"
 
 import { useEffect, useState } from "react"
-import { collection, onSnapshot } from "firebase/firestore"
+import { collection, onSnapshot, query, orderBy } from "firebase/firestore"
 import { db } from "./firebase"
 
 import {
@@ -20,6 +20,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
 function App() {
   const [alertCounts, setAlertCounts] = useState([0, 0, 0, 0])
   const [tanks, setTanks] = useState([])
+  const [alerts, setAlerts] = useState([])
   const [searchText, setSearchText] = useState("")
   const [notFound, setNotFound] = useState(false)
   const [activePage, setActivePage] = useState("dashboard")
@@ -105,6 +106,24 @@ function App() {
 
     return () => unsubscribe()
   }, [])
+
+  useEffect(() => {
+  const alertsQuery = query(
+    collection(db, "low_water_alerts"),
+    orderBy("createdAt", "desc")
+  )
+
+  const unsubscribe = onSnapshot(alertsQuery, (snapshot) => {
+    const alertList = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }))
+
+    setAlerts(alertList)
+  })
+
+  return () => unsubscribe()
+}, [])
 
   const lowWaterAlertData = {
     labels: ["Week 1", "Week 2", "Week 3", "Week 4"],
@@ -282,7 +301,7 @@ function App() {
           {activePage === "deliveries" && <DeliveriesPage />}
           {activePage === "wallet" && <Page title="Wallet & Payments" />}
           {activePage === "transactions" && <Page title="Transactions" />}
-          {activePage === "alerts" && <Page title="Alerts" />}
+          {activePage === "alerts" && <AlertsPage alerts={alerts} />}
         </div>
       </div>
     </div>
@@ -557,6 +576,69 @@ function Activity({ text, time, priority }) {
     </div>
   )
 }
+
+function AlertsPage({ alerts }) {
+  return (
+    <div className="card">
+      <h1 className="text-3xl font-bold">Alerts</h1>
+
+      <p className="text-gray-400 mt-2 mb-6">
+        Recent low water alerts from all monitored devices.
+      </p>
+
+      <div className="space-y-4">
+        {alerts.length === 0 ? (
+          <p className="text-gray-500">No alerts found.</p>
+        ) : (
+          alerts.map((alert) => {
+            const dateObj = alert.createdAt?.toDate?.()
+            const date = dateObj
+              ? dateObj.toLocaleDateString()
+              : "No date"
+
+            const time = dateObj
+              ? dateObj.toLocaleTimeString()
+              : "No time"
+
+            return (
+              <div
+                key={alert.id}
+                className="bg-[#111827] border border-red-900/60 rounded-2xl p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+              >
+                <div>
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 rounded-full bg-red-500"></span>
+
+                    <h3 className="text-xl font-bold text-red-400">
+                      Low Water Alert
+                    </h3>
+                  </div>
+
+                  <p className="text-gray-400 mt-2">
+                    Device:{" "}
+                    <span className="text-white font-semibold">
+                      {alert.device_id}
+                    </span>
+                  </p>
+
+                  <p className="text-gray-500 text-sm mt-1">
+                    Water level: {alert.water_level}
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-white font-semibold">{date}</p>
+                  <p className="text-gray-400 text-sm">{time}</p>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
 
 function Page({ title }) {
   return (
