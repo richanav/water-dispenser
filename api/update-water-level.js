@@ -26,18 +26,51 @@ export default async function handler(req, res) {
     const waterLevel = String(data.water_level).toLowerCase()
     const battery = data.battery || "0"
 
-    await db.collection("devices").doc(deviceId).set({
-      device_id: deviceId,
-      water_level: waterLevel,
-      battery: battery,
-      status: "online",
-      timestamp: Date.now(),
-    })
+    if (!deviceId) {
+      return res.status(400).send("device_id is required")
+    }
+
+    const deviceRef = db.collection("devices").doc(deviceId)
+    const deviceDoc = await deviceRef.get()
+
+    if (!deviceDoc.exists) {
+      return res.status(404).send("Device not registered in Firebase")
+    }
+
+    const deviceData = deviceDoc.data()
+    const customerId = deviceData.customerId
+
+    if (!customerId) {
+      return res.status(400).send("customerId missing in device document")
+    }
+
+    await deviceRef.set(
+      {
+        deviceId: deviceId,
+        customerId: customerId,
+        water_level: waterLevel,
+        battery: battery,
+        status: "online",
+        timestamp: new Date(),
+      },
+      { merge: true }
+    )
 
     if (waterLevel === "low") {
-      await db.collection("low_water_alerts").add({
-        device_id: deviceId,
+      await db.collection("alerts").add({
+        deviceId: deviceId,
+        customerId: customerId,
+        type: "low_water",
         water_level: waterLevel,
+        createdAt: new Date(),
+      })
+
+      await db.collection("notifications").add({
+        customerId: customerId,
+        deviceId: deviceId,
+        title: "Low Water Alert",
+        message: `Low water detected in ${deviceId}`,
+        read: false,
         createdAt: new Date(),
       })
     }

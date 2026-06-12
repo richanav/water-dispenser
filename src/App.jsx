@@ -1,7 +1,16 @@
 import { FiBell, FiSearch, FiUser } from "react-icons/fi"
 
 import { useEffect, useState } from "react"
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore"
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  getDocs,
+  doc,
+  setDoc,
+  serverTimestamp,
+} from "firebase/firestore"
 import { db } from "./firebase"
 
 import {
@@ -26,6 +35,20 @@ function App() {
   const [activePage, setActivePage] = useState("dashboard")
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
 
+  const [notifications, setNotifications] = useState([])
+  const [showNotifications, setShowNotifications] = useState(false)
+
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [phone, setPhone] = useState("")
+  const [customerId, setCustomerId] = useState("")
+  const [customerName, setCustomerName] = useState("")
+  const [loginError, setLoginError] = useState("")
+
+  const [showRegister, setShowRegister] = useState(false)
+  const [registerName, setRegisterName] = useState("")
+  const [registerPhone, setRegisterPhone] = useState("")
+  const [deviceCount, setDeviceCount] = useState(1)
+
   const totalAlerts = alertCounts.reduce((sum, count) => sum + count, 0)
   const averageAlerts = (totalAlerts / 4).toFixed(1)
 
@@ -33,8 +56,6 @@ function App() {
     dashboard: "Dashboard",
     tank: "My Tank",
     deliveries: "Deliveries",
-    wallet: "Wallet & Payments",
-    transactions: "Transactions",
     alerts: "Alerts",
     graph: "Graph",
   }
@@ -52,13 +73,7 @@ function App() {
       } else if (value.includes("deliver")) {
         setActivePage("deliveries")
         setNotFound(false)
-      } else if (value.includes("wallet") || value.includes("payment")) {
-        setActivePage("wallet")
-        setNotFound(false)
-      } else if (value.includes("transaction")) {
-        setActivePage("transactions")
-        setNotFound(false)
-      }else if (value.includes("alert")) {
+      } else if (value.includes("alert")) {
         setActivePage("alerts")
         setNotFound(false)
       } else if (value.includes("graph")) {
@@ -70,32 +85,114 @@ function App() {
     }
   }
 
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, "low_water_alerts"),
-      (snapshot) => {
-        const weekCounts = [0, 0, 0, 0]
+  const loginCustomer = async () => {
+    setLoginError("")
 
-        snapshot.docs.forEach((doc) => {
-          const data = doc.data()
-          const date = data.createdAt?.toDate?.()
+    const enteredPhone = phone.trim()
 
-          if (date && date.getMonth() === selectedMonth) {
-            const day = date.getDate()
-            const week = Math.min(Math.ceil(day / 7), 4)
-            weekCounts[week - 1]++
-          }
-        })
-
-        setAlertCounts(weekCounts)
-      }
+    const q = query(
+      collection(db, "customers"),
+      where("phone", "==", enteredPhone)
     )
 
-    return () => unsubscribe()
-  }, [selectedMonth])
+    const snapshot = await getDocs(q)
+
+    if (snapshot.empty) {
+      setLoginError("Customer not found")
+      return
+    }
+
+    const customer = snapshot.docs[0].data()
+
+    setCustomerId(customer.customerId)
+    setCustomerName(customer.name)
+    setIsLoggedIn(true)
+  }
+
+  const registerCustomer = async () => {
+    const name = registerName.trim()
+    const phoneNumber = registerPhone.trim()
+    const count = Number(deviceCount)
+
+    if (!name || !phoneNumber || count <= 0) {
+      alert("Please enter name, phone number, and valid device count")
+      return
+    }
+
+    const customerId = "customer_" + Date.now()
+
+    await setDoc(doc(db, "customers", customerId), {
+      customerId: customerId,
+      name: name,
+      phone: phoneNumber,
+    })
+
+    const createdDevices = []
+
+    for (let i = 1; i <= count; i++) {
+      const deviceId = `water_device_${Date.now()}_${i}`
+
+      await setDoc(doc(db, "devices", deviceId), {
+        deviceId: deviceId,
+        customerId: customerId,
+        status: "offline",
+        water_level: "high",
+        timestamp: serverTimestamp(),
+      })
+
+      createdDevices.push(deviceId)
+    }
+
+    alert(
+      `Registration successful!\n\nCustomer ID: ${customerId}\n\nDevice IDs:\n${createdDevices.join(
+        "\n"
+      )}\n\nUse this phone number to login.`
+    )
+
+    setShowRegister(false)
+    setPhone(phoneNumber)
+    setRegisterName("")
+    setRegisterPhone("")
+    setDeviceCount(1)
+  }
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "devices"), (snapshot) => {
+    if (!customerId) return
+
+    const alertsQuery = query(
+      collection(db, "alerts"),
+      where("customerId", "==", customerId)
+    )
+
+    const unsubscribe = onSnapshot(alertsQuery, (snapshot) => {
+      const weekCounts = [0, 0, 0, 0]
+
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data()
+        const date = data.createdAt?.toDate?.()
+
+        if (date && date.getMonth() === selectedMonth) {
+          const day = date.getDate()
+          const week = Math.min(Math.ceil(day / 7), 4)
+          weekCounts[week - 1]++
+        }
+      })
+
+      setAlertCounts(weekCounts)
+    })
+
+    return () => unsubscribe()
+  }, [customerId, selectedMonth])
+
+  useEffect(() => {
+    if (!customerId) return
+
+    const devicesQuery = query(
+      collection(db, "devices"),
+      where("customerId", "==", customerId)
+    )
+
+    const unsubscribe = onSnapshot(devicesQuery, (snapshot) => {
       const tankList = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -105,25 +202,59 @@ function App() {
     })
 
     return () => unsubscribe()
-  }, [])
+  }, [customerId])
 
   useEffect(() => {
-  const alertsQuery = query(
-    collection(db, "low_water_alerts"),
-    orderBy("createdAt", "desc")
-  )
+    if (!customerId) return
 
-  const unsubscribe = onSnapshot(alertsQuery, (snapshot) => {
-    const alertList = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }))
+    const alertsQuery = query(
+      collection(db, "alerts"),
+      where("customerId", "==", customerId)
+    )
 
-    setAlerts(alertList)
-  })
+    const unsubscribe = onSnapshot(alertsQuery, (snapshot) => {
+      const alertList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
 
-  return () => unsubscribe()
-}, [])
+      alertList.sort((a, b) => {
+        const timeA = a.createdAt?.toDate?.()?.getTime() || 0
+        const timeB = b.createdAt?.toDate?.()?.getTime() || 0
+        return timeB - timeA
+      })
+
+      setAlerts(alertList)
+    })
+
+    return () => unsubscribe()
+  }, [customerId])
+
+  useEffect(() => {
+    if (!customerId) return
+
+    const notificationsQuery = query(
+      collection(db, "notifications"),
+      where("customerId", "==", customerId)
+    )
+
+    const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {
+      const list = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+
+      list.sort((a, b) => {
+        const timeA = a.createdAt?.toDate?.()?.getTime() || 0
+        const timeB = b.createdAt?.toDate?.()?.getTime() || 0
+        return timeB - timeA
+      })
+
+      setNotifications(list)
+    })
+
+    return () => unsubscribe()
+  }, [customerId])
 
   const lowWaterAlertData = {
     labels: ["Week 1", "Week 2", "Week 3", "Week 4"],
@@ -138,7 +269,12 @@ function App() {
   }
 
   const requestDelivery = async () => {
-    console.log("Button clicked")
+    const firstDeviceId = tanks[0]?.deviceId || tanks[0]?.id
+
+    if (!firstDeviceId) {
+      alert("No device found for this customer")
+      return
+    }
 
     await fetch("http://192.168.1.39:3000/request-delivery", {
       method: "POST",
@@ -146,11 +282,104 @@ function App() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        customerName: "Richa",
-        customerPhone: "9745554888",
-        deviceId: "water_device_20",
+        deviceId: firstDeviceId,
       }),
     })
+  }
+
+  if (showRegister) {
+    return (
+      <div className="min-h-screen bg-[#0b1120] text-white flex items-center justify-center">
+        <div className="bg-[#1e293b] p-8 rounded-2xl w-[380px]">
+          <h1 className="text-3xl font-bold text-blue-400 mb-6">
+            Register Customer
+          </h1>
+
+          <input
+            type="text"
+            placeholder="Enter name"
+            value={registerName}
+            onChange={(e) => setRegisterName(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl bg-[#0f172a] outline-none mb-4"
+          />
+
+          <input
+            type="text"
+            placeholder="Enter phone number"
+            value={registerPhone}
+            onChange={(e) => setRegisterPhone(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl bg-[#0f172a] outline-none mb-4"
+          />
+
+          <input
+            type="number"
+            placeholder="Number of devices"
+            value={deviceCount}
+            min="1"
+            onChange={(e) => setDeviceCount(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl bg-[#0f172a] outline-none mb-4"
+          />
+
+          <button
+            onClick={registerCustomer}
+            className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl"
+          >
+            Register
+          </button>
+
+          <p className="text-gray-400 text-sm mt-4 text-center">
+            Already registered?{" "}
+            <span
+              onClick={() => setShowRegister(false)}
+              className="text-blue-400 cursor-pointer"
+            >
+              Login
+            </span>
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-[#0b1120] text-white flex items-center justify-center">
+        <div className="bg-[#1e293b] p-8 rounded-2xl w-[350px]">
+          <h1 className="text-3xl font-bold text-blue-400 mb-6">
+            AquaAlert Login
+          </h1>
+
+          <input
+            type="text"
+            placeholder="Enter phone number"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl bg-[#0f172a] outline-none mb-4"
+          />
+
+          {loginError && (
+            <p className="text-red-400 text-sm mb-3">{loginError}</p>
+          )}
+
+          <button
+            onClick={loginCustomer}
+            className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl"
+          >
+            Login
+          </button>
+
+          <p className="text-gray-400 text-sm mt-4 text-center">
+            New user?{" "}
+            <span
+              onClick={() => setShowRegister(true)}
+              className="text-blue-400 cursor-pointer"
+            >
+              Register now
+            </span>
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -165,8 +394,6 @@ function App() {
             <MenuItem text="Dashboard" active={activePage === "dashboard"} onClick={() => setActivePage("dashboard")} />
             <MenuItem text="My Tank" active={activePage === "tank"} onClick={() => setActivePage("tank")} />
             <MenuItem text="Deliveries" active={activePage === "deliveries"} onClick={() => setActivePage("deliveries")} />
-            <MenuItem text="Wallet & Payments" active={activePage === "wallet"} onClick={() => setActivePage("wallet")} />
-            <MenuItem text="Transactions" active={activePage === "transactions"} onClick={() => setActivePage("transactions")} />
             <MenuItem text="Alerts" active={activePage === "alerts"} onClick={() => setActivePage("alerts")} />
             <MenuItem text="Graph" active={activePage === "graph"} onClick={() => setActivePage("graph")} />
           </div>
@@ -178,6 +405,11 @@ function App() {
             searchText={searchText}
             setSearchText={setSearchText}
             handleSearch={handleSearch}
+            notifications={notifications}
+            showNotifications={showNotifications}
+            setShowNotifications={setShowNotifications}
+            setActivePage={setActivePage}
+            customerName={customerName}
           />
 
           {notFound && (
@@ -193,11 +425,10 @@ function App() {
 
           {activePage === "dashboard" && (
             <>
-              <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+              <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
                 <StatCard title="Tanks Monitored" value={tanks.length} sub="Active" badge="Online" />
                 <StatCard title="Low Water Alerts" value={totalAlerts} sub="This Month" badge="Normal" />
                 <StatCard title="Average Low Alerts" value={averageAlerts} sub="Per Week" badge="Avg" />
-                <StatCard title="Next Delivery" value="Today 2 PM" sub="Refill Pending" badge="Pending" gradient />
               </section>
 
               <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -222,7 +453,7 @@ function App() {
                         return (
                           <TankCard
                             key={tank.id}
-                            name={tank.device_id || tank.id}
+                            name={tank.deviceId || tank.id}
                             danger={isLow}
                           />
                         )
@@ -279,7 +510,7 @@ function App() {
                   return (
                     <TankCard
                       key={tank.id}
-                      name={tank.device_id || tank.id}
+                      name={tank.deviceId || tank.id}
                       danger={isLow}
                     />
                   )
@@ -299,8 +530,6 @@ function App() {
           )}
 
           {activePage === "deliveries" && <DeliveriesPage />}
-          {activePage === "wallet" && <Page title="Wallet & Payments" />}
-          {activePage === "transactions" && <Page title="Transactions" />}
           {activePage === "alerts" && <AlertsPage alerts={alerts} />}
         </div>
       </div>
@@ -308,7 +537,17 @@ function App() {
   )
 }
 
-function TopNavbar({ title, searchText, setSearchText, handleSearch }) {
+function TopNavbar({
+  title,
+  searchText,
+  setSearchText,
+  handleSearch,
+  notifications,
+  showNotifications,
+  setShowNotifications,
+  setActivePage,
+  customerName,
+}) {
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
       <div>
@@ -329,17 +568,62 @@ function TopNavbar({ title, searchText, setSearchText, handleSearch }) {
           />
         </div>
 
-        <button className="relative bg-[#1e293b] p-3 rounded-xl border border-gray-800">
-          <FiBell />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="relative bg-[#1e293b] p-3 rounded-xl border border-gray-800"
+          >
+            <FiBell />
+
+            {notifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                {notifications.length}
+              </span>
+            )}
+          </button>
+
+          {showNotifications && (
+            <div className="absolute right-0 mt-3 w-80 bg-[#111827] border border-gray-700 rounded-2xl shadow-2xl z-50">
+              <div className="p-4 border-b border-gray-700">
+                <h3 className="font-bold">Notifications</h3>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <p className="p-4 text-gray-500">
+                    No notifications
+                  </p>
+                ) : (
+                  notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className="p-4 border-b border-gray-800 hover:bg-[#1e293b] cursor-pointer"
+                      onClick={() => {
+                        setActivePage("alerts")
+                        setShowNotifications(false)
+                      }}
+                    >
+                      <p className="font-semibold">
+                        {notification.title}
+                      </p>
+
+                      <p className="text-sm text-gray-400">
+                        {notification.message}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-2 bg-[#1e293b] px-3 py-2 rounded-xl border border-gray-800">
           <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
             <FiUser />
           </div>
 
-          <span className="text-sm">Admin</span>
+          <span className="text-sm">{customerName}</span>
         </div>
       </div>
     </div>
@@ -356,48 +640,15 @@ function DeliveriesPage() {
         </p>
 
         <div className="mt-8 max-w-3xl">
-          <DeliveryStep
-            status="done"
-            title="Ordered"
-            desc="Your water can delivery request has been placed."
-            time="10:30 AM"
-          />
-
+          <DeliveryStep status="done" title="Ordered" desc="Your water can delivery request has been placed." time="10:30 AM" />
           <DeliveryLine active />
-
-          <DeliveryStep
-            status="done"
-            title="Confirmed"
-            desc="Vendor has accepted your delivery request."
-            time="10:35 AM"
-          />
-
+          <DeliveryStep status="done" title="Confirmed" desc="Vendor has accepted your delivery request." time="10:35 AM" />
           <DeliveryLine active />
-
-          <DeliveryStep
-            status="current"
-            title="Out for Delivery"
-            desc="Your water can is on the way."
-            time="Expected: Today, 2:00 PM"
-          />
-
+          <DeliveryStep status="current" title="Out for Delivery" desc="Your water can is on the way." time="Expected: Today, 2:00 PM" />
           <DeliveryLine />
-
-          <DeliveryStep
-            status="pending"
-            title="Arriving Soon"
-            desc="Delivery person will reach your location shortly."
-            time="Pending"
-          />
-
+          <DeliveryStep status="pending" title="Arriving Soon" desc="Delivery person will reach your location shortly." time="Pending" />
           <DeliveryLine />
-
-          <DeliveryStep
-            status="pending"
-            title="Arrived"
-            desc="Delivery will be completed once the can is delivered."
-            time="Pending"
-          />
+          <DeliveryStep status="pending" title="Arrived" desc="Delivery will be completed once the can is delivered." time="Pending" />
         </div>
       </div>
     </div>
@@ -499,14 +750,8 @@ function TankCard({ name, danger }) {
         danger ? "bg-[#2a1a1a] border-red-800" : "bg-[#111827] border-gray-800"
       }`}
     >
-      <div className="flex justify-between items-center gap-3">
+      <div className="flex justify-between items-center">
         <h4 className="font-semibold text-xl">{name}</h4>
-
-        {danger && (
-          <span className="text-xs px-3 py-2 rounded-full bg-red-900 text-red-300">
-            LOW
-          </span>
-        )}
       </div>
 
       <div className="mt-5 h-52 flex items-end justify-center">
@@ -583,7 +828,7 @@ function AlertsPage({ alerts }) {
       <h1 className="text-3xl font-bold">Alerts</h1>
 
       <p className="text-gray-400 mt-2 mb-6">
-        Recent low water alerts from all monitored devices.
+        Recent low water alerts from your monitored devices.
       </p>
 
       <div className="space-y-4">
@@ -592,13 +837,8 @@ function AlertsPage({ alerts }) {
         ) : (
           alerts.map((alert) => {
             const dateObj = alert.createdAt?.toDate?.()
-            const date = dateObj
-              ? dateObj.toLocaleDateString()
-              : "No date"
-
-            const time = dateObj
-              ? dateObj.toLocaleTimeString()
-              : "No time"
+            const date = dateObj ? dateObj.toLocaleDateString() : "No date"
+            const time = dateObj ? dateObj.toLocaleTimeString() : "No time"
 
             return (
               <div
@@ -617,7 +857,7 @@ function AlertsPage({ alerts }) {
                   <p className="text-gray-400 mt-2">
                     Device:{" "}
                     <span className="text-white font-semibold">
-                      {alert.device_id}
+                      {alert.deviceId}
                     </span>
                   </p>
 
@@ -635,18 +875,6 @@ function AlertsPage({ alerts }) {
           })
         )}
       </div>
-    </div>
-  )
-}
-
-
-function Page({ title }) {
-  return (
-    <div className="card">
-      <h1 className="text-3xl font-bold">{title}</h1>
-      <p className="text-gray-400 mt-4">
-        This page can be updated with details later.
-      </p>
     </div>
   )
 }
