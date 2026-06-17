@@ -55,9 +55,9 @@ function App() {
   const pageTitles = {
     dashboard: "Dashboard",
     tank: "My Tank",
-    deliveries: "Deliveries",
     alerts: "Alerts",
     graph: "Graph",
+    profile: "Profile",
   }
 
   const handleSearch = (e) => {
@@ -70,14 +70,14 @@ function App() {
       } else if (value.includes("tank")) {
         setActivePage("tank")
         setNotFound(false)
-      } else if (value.includes("deliver")) {
-        setActivePage("deliveries")
-        setNotFound(false)
       } else if (value.includes("alert")) {
         setActivePage("alerts")
         setNotFound(false)
       } else if (value.includes("graph")) {
         setActivePage("graph")
+        setNotFound(false)
+      } else if (value.includes("profile")) {
+        setActivePage("profile")
         setNotFound(false)
       } else {
         setNotFound(true)
@@ -157,32 +157,30 @@ function App() {
   }
 
   useEffect(() => {
-    if (!customerId) return
+  if (!customerId) return
 
-    const alertsQuery = query(
-      collection(db, "alerts"),
-      where("customerId", "==", customerId)
-    )
+  const unsubscribe = onSnapshot(collection(db, "alerts"), (snapshot) => {
+    const weekCounts = [0, 0, 0, 0]
 
-    const unsubscribe = onSnapshot(alertsQuery, (snapshot) => {
-      const weekCounts = [0, 0, 0, 0]
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data()
 
-      snapshot.docs.forEach((doc) => {
-        const data = doc.data()
-        const date = data.createdAt?.toDate?.()
+      if (String(data.customerId).trim() !== String(customerId).trim()) return
 
-        if (date && date.getMonth() === selectedMonth) {
-          const day = date.getDate()
-          const week = Math.min(Math.ceil(day / 7), 4)
-          weekCounts[week - 1]++
-        }
-      })
+      const date = data.createdAt?.toDate?.()
 
-      setAlertCounts(weekCounts)
+      if (date && date.getMonth() === selectedMonth) {
+        const day = date.getDate()
+        const week = Math.min(Math.ceil(day / 7), 4)
+        weekCounts[week - 1]++
+      }
     })
 
-    return () => unsubscribe()
-  }, [customerId, selectedMonth])
+    setAlertCounts(weekCounts)
+  })
+
+  return () => unsubscribe()
+}, [customerId, selectedMonth])
 
   useEffect(() => {
     if (!customerId) return
@@ -205,30 +203,29 @@ function App() {
   }, [customerId])
 
   useEffect(() => {
-    if (!customerId) return
+  if (!customerId) return
 
-    const alertsQuery = query(
-      collection(db, "alerts"),
-      where("customerId", "==", customerId)
-    )
-
-    const unsubscribe = onSnapshot(alertsQuery, (snapshot) => {
-      const alertList = snapshot.docs.map((doc) => ({
+  const unsubscribe = onSnapshot(collection(db, "alerts"), (snapshot) => {
+    const alertList = snapshot.docs
+      .map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }))
-
-      alertList.sort((a, b) => {
-        const timeA = a.createdAt?.toDate?.()?.getTime() || 0
-        const timeB = b.createdAt?.toDate?.()?.getTime() || 0
-        return timeB - timeA
+      .filter((alert) => {
+        return String(alert.customerId).trim() === String(customerId).trim()
       })
 
-      setAlerts(alertList)
+    alertList.sort((a, b) => {
+      const timeA = a.createdAt?.toDate?.()?.getTime() || 0
+      const timeB = b.createdAt?.toDate?.()?.getTime() || 0
+      return timeB - timeA
     })
 
-    return () => unsubscribe()
-  }, [customerId])
+    setAlerts(alertList)
+  })
+
+  return () => unsubscribe()
+}, [customerId])
 
   useEffect(() => {
     if (!customerId) return
@@ -393,9 +390,9 @@ function App() {
           <div className="space-y-4">
             <MenuItem text="Dashboard" active={activePage === "dashboard"} onClick={() => setActivePage("dashboard")} />
             <MenuItem text="My Tank" active={activePage === "tank"} onClick={() => setActivePage("tank")} />
-            <MenuItem text="Deliveries" active={activePage === "deliveries"} onClick={() => setActivePage("deliveries")} />
             <MenuItem text="Alerts" active={activePage === "alerts"} onClick={() => setActivePage("alerts")} />
             <MenuItem text="Graph" active={activePage === "graph"} onClick={() => setActivePage("graph")} />
+            <MenuItem text="Profile" active={activePage === "profile"} onClick={() => setActivePage("profile")} />
           </div>
         </div>
 
@@ -529,8 +526,14 @@ function App() {
             </div>
           )}
 
-          {activePage === "deliveries" && <DeliveriesPage />}
           {activePage === "alerts" && <AlertsPage alerts={alerts} />}
+          {activePage === "profile" && (
+  <ProfilePage
+    customerName={customerName}
+    phone={phone}
+    tanks={tanks}
+  />
+)}
         </div>
       </div>
     </div>
@@ -630,75 +633,7 @@ function TopNavbar({
   )
 }
 
-function DeliveriesPage() {
-  return (
-    <div className="space-y-6">
-      <div className="card">
-        <h1 className="text-3xl font-bold">Delivery Status</h1>
-        <p className="text-gray-400 mt-2">
-          Track your water can delivery in real time.
-        </p>
 
-        <div className="mt-8 max-w-3xl">
-          <DeliveryStep status="done" title="Ordered" desc="Your water can delivery request has been placed." time="10:30 AM" />
-          <DeliveryLine active />
-          <DeliveryStep status="done" title="Confirmed" desc="Vendor has accepted your delivery request." time="10:35 AM" />
-          <DeliveryLine active />
-          <DeliveryStep status="current" title="Out for Delivery" desc="Your water can is on the way." time="Expected: Today, 2:00 PM" />
-          <DeliveryLine />
-          <DeliveryStep status="pending" title="Arriving Soon" desc="Delivery person will reach your location shortly." time="Pending" />
-          <DeliveryLine />
-          <DeliveryStep status="pending" title="Arrived" desc="Delivery will be completed once the can is delivered." time="Pending" />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function DeliveryStep({ status, title, desc, time }) {
-  const isDone = status === "done"
-  const isCurrent = status === "current"
-
-  return (
-    <div className="flex items-center gap-5">
-      <div
-        className={`w-12 h-12 rounded-full flex items-center justify-center font-bold border-2 ${
-          isDone
-            ? "bg-green-600 border-green-600 text-white"
-            : isCurrent
-            ? "bg-blue-600 border-blue-600 text-white animate-pulse"
-            : "bg-[#111827] border-gray-600 text-gray-400"
-        }`}
-      >
-        {isDone ? "✓" : isCurrent ? "●" : "○"}
-      </div>
-
-      <div className="flex-1">
-        <h3
-          className={`text-xl font-bold ${
-            isCurrent ? "text-blue-400" : isDone ? "text-green-400" : "text-gray-300"
-          }`}
-        >
-          {title}
-        </h3>
-
-        <p className="text-gray-400 text-sm mt-1">{desc}</p>
-      </div>
-
-      <p className="text-sm text-gray-500">{time}</p>
-    </div>
-  )
-}
-
-function DeliveryLine({ active }) {
-  return (
-    <div
-      className={`w-[3px] h-12 ml-6 my-2 rounded-full ${
-        active ? "bg-green-500" : "bg-gray-700"
-      }`}
-    ></div>
-  )
-}
 
 function MenuItem({ text, active, onClick }) {
   return (
@@ -873,6 +808,56 @@ function AlertsPage({ alerts }) {
               </div>
             )
           })
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ProfilePage({ customerName, phone, tanks }) {
+  return (
+    <div className="card">
+      <h1 className="text-3xl font-bold mb-6">User Profile</h1>
+
+      <div className="space-y-3 mb-8">
+        <p className="text-gray-400">
+          Name: <span className="text-white font-semibold">{customerName}</span>
+        </p>
+
+        <p className="text-gray-400">
+          Phone: <span className="text-white font-semibold">{phone}</span>
+        </p>
+
+        <p className="text-gray-400">
+          Total Devices:{" "}
+          <span className="text-white font-semibold">{tanks.length}</span>
+        </p>
+      </div>
+
+      <h2 className="text-2xl font-bold mb-4">Devices</h2>
+
+      <div className="space-y-3">
+        {tanks.length === 0 ? (
+          <p className="text-gray-500">No devices found.</p>
+        ) : (
+          tanks.map((tank) => (
+            <div
+              key={tank.id}
+              className="bg-[#111827] border border-gray-800 rounded-xl p-4"
+            >
+              <p className="font-semibold">
+                {tank.deviceId || tank.id}
+              </p>
+
+              <p className="text-sm text-gray-400">
+                Water Level: {tank.water_level}
+              </p>
+
+              <p className="text-sm text-gray-400">
+                Status: {tank.status}
+              </p>
+            </div>
+          ))
         )}
       </div>
     </div>

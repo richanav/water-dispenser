@@ -312,27 +312,27 @@ app.post("/update-water-level", async (req, res) => {
 
     console.log("✅ Firebase Device Updated");
 
-    if (currentLevel === "low") {
-      await db.collection("alerts").add({
-        customerId,
-        deviceId,
-        type: "low_water",
-        water_level: currentLevel,
-        createdAt: new Date(),
-      });
+    if (previousLevel === "high" && currentLevel === "low") {
+  await db.collection("alerts").add({
+    customerId,
+    deviceId,
+    type: "low_water",
+    water_level: currentLevel,
+    createdAt: new Date(),
+  });
 
-      console.log("✅ Low water alert stored");
+  console.log("✅ Low water alert stored");
 
-      await db.collection("notifications").add({
-        customerId,
-        deviceId,
-        type: "low_water",
-        title: "Low Water Alert Sent",
-        message: `Low water alert sent for ${deviceId}`,
-        read: false,
-        createdAt: new Date(),
-      });
-    }
+  await db.collection("notifications").add({
+    customerId,
+    deviceId,
+    type: "low_water",
+    title: "Low Water Alert Sent",
+    message: `Low water alert sent for ${deviceId}`,
+    read: false,
+    createdAt: new Date(),
+  });
+}
 
     console.log("previousLevel =", previousLevel);
     console.log("currentLevel =", currentLevel);
