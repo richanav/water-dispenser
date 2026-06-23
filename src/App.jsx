@@ -275,7 +275,7 @@ function App() {
       }
 
       const response = await fetch(
-        "http://192.168.1.47:3000/request-delivery",
+        "http://192.168.1.XX:3000/request-delivery",
         {
           method: "POST",
           headers: {

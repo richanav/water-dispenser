@@ -1,15 +1,15 @@
-what to do 
-1. Clone repository
-2. Run npm install
-3. Add water-dispenser-key.json to home/water-dashboard
-4. Run npm run dev
+Getting started
+1. Pull the code 
+2. Make the circuit connections given below:
 
-   
-please note
-server.js contains backend i.e connecting esp32 to firebase
-App.jsx contains dashboard
+## Circuit Connection
 
-# React + Vite
+![Sensor Connection](images/interface_diagram.jpg)
+
+
+3. Make sure to change the IP address in the URL to your computer IP address in the ESP code and App.jsx file inside the function App(). To find IP address, go to terminal and run hostname -I command. 
+4. Now to run the frontend, type the command npm run dev in your terminal.
+5. Now use another terminal to run your backend. Type the command node server.cjs to run the backend. 
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
