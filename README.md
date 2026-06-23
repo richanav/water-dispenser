@@ -4,7 +4,7 @@ Getting started
 
 ## Circuit Connection
 
-![Sensor Connection](images/interface_diagram.jpg)
+![Sensor Connection](images/interface_diagram.png)
 
 
 3. Make sure to change the IP address in the URL to your computer IP address in the ESP code and App.jsx file inside the function App(). To find IP address, go to terminal and run hostname -I command. 
