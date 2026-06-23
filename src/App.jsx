@@ -157,30 +157,30 @@ function App() {
   }
 
   useEffect(() => {
-  if (!customerId) return
+    if (!customerId) return
 
-  const unsubscribe = onSnapshot(collection(db, "alerts"), (snapshot) => {
-    const weekCounts = [0, 0, 0, 0]
+    const unsubscribe = onSnapshot(collection(db, "alerts"), (snapshot) => {
+      const weekCounts = [0, 0, 0, 0]
 
-    snapshot.docs.forEach((doc) => {
-      const data = doc.data()
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data()
 
-      if (String(data.customerId).trim() !== String(customerId).trim()) return
+        if (String(data.customerId).trim() !== String(customerId).trim()) return
 
-      const date = data.createdAt?.toDate?.()
+        const date = data.createdAt?.toDate?.()
 
-      if (date && date.getMonth() === selectedMonth) {
-        const day = date.getDate()
-        const week = Math.min(Math.ceil(day / 7), 4)
-        weekCounts[week - 1]++
-      }
+        if (date && date.getMonth() === selectedMonth) {
+          const day = date.getDate()
+          const week = Math.min(Math.ceil(day / 7), 4)
+          weekCounts[week - 1]++
+        }
+      })
+
+      setAlertCounts(weekCounts)
     })
 
-    setAlertCounts(weekCounts)
-  })
-
-  return () => unsubscribe()
-}, [customerId, selectedMonth])
+    return () => unsubscribe()
+  }, [customerId, selectedMonth])
 
   useEffect(() => {
     if (!customerId) return
@@ -203,29 +203,29 @@ function App() {
   }, [customerId])
 
   useEffect(() => {
-  if (!customerId) return
+    if (!customerId) return
 
-  const unsubscribe = onSnapshot(collection(db, "alerts"), (snapshot) => {
-    const alertList = snapshot.docs
-      .map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
-      .filter((alert) => {
-        return String(alert.customerId).trim() === String(customerId).trim()
+    const unsubscribe = onSnapshot(collection(db, "alerts"), (snapshot) => {
+      const alertList = snapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .filter((alert) => {
+          return String(alert.customerId).trim() === String(customerId).trim()
+        })
+
+      alertList.sort((a, b) => {
+        const timeA = a.createdAt?.toDate?.()?.getTime() || 0
+        const timeB = b.createdAt?.toDate?.()?.getTime() || 0
+        return timeB - timeA
       })
 
-    alertList.sort((a, b) => {
-      const timeA = a.createdAt?.toDate?.()?.getTime() || 0
-      const timeB = b.createdAt?.toDate?.()?.getTime() || 0
-      return timeB - timeA
+      setAlerts(alertList)
     })
 
-    setAlerts(alertList)
-  })
-
-  return () => unsubscribe()
-}, [customerId])
+    return () => unsubscribe()
+  }, [customerId])
 
   useEffect(() => {
     if (!customerId) return
@@ -266,22 +266,38 @@ function App() {
   }
 
   const requestDelivery = async () => {
-    const firstDeviceId = tanks[0]?.deviceId || tanks[0]?.id
+    try {
+      const firstDeviceId = tanks[0]?.deviceId || tanks[0]?.id
 
-    if (!firstDeviceId) {
-      alert("No device found for this customer")
-      return
+      if (!firstDeviceId) {
+        alert("No device found for this customer")
+        return
+      }
+
+      const response = await fetch(
+        "http://192.168.1.47:3000/request-delivery",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            deviceId: firstDeviceId,
+          }),
+        }
+      )
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.message || "Request failed")
+      }
+
+      alert("Delivery request sent to vendor!")
+    } catch (error) {
+      console.error("Delivery request failed:", error)
+      alert("Failed to send delivery request")
     }
-
-    await fetch("http://192.168.1.39:3000/request-delivery", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        deviceId: firstDeviceId,
-      }),
-    })
   }
 
   if (showRegister) {
@@ -527,13 +543,14 @@ function App() {
           )}
 
           {activePage === "alerts" && <AlertsPage alerts={alerts} />}
+
           {activePage === "profile" && (
-  <ProfilePage
-    customerName={customerName}
-    phone={phone}
-    tanks={tanks}
-  />
-)}
+            <ProfilePage
+              customerName={customerName}
+              phone={phone}
+              tanks={tanks}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -602,7 +619,12 @@ function TopNavbar({
                       key={notification.id}
                       className="p-4 border-b border-gray-800 hover:bg-[#1e293b] cursor-pointer"
                       onClick={() => {
-                        setActivePage("alerts")
+                        if (notification.type === "delivery") {
+                          setActivePage("profile")
+                        } else {
+                          setActivePage("alerts")
+                        }
+
                         setShowNotifications(false)
                       }}
                     >
@@ -632,8 +654,6 @@ function TopNavbar({
     </div>
   )
 }
-
-
 
 function MenuItem({ text, active, onClick }) {
   return (

@@ -34,7 +34,7 @@ app.use(express.json());
 
 let sock;
 
-const VENDOR_NUMBER = "918105730925@s.whatsapp.net";
+const VENDOR_NUMBER = "918105730565@s.whatsapp.net";
 
 /* HELPERS */
 
@@ -312,43 +312,36 @@ app.post("/update-water-level", async (req, res) => {
 
     console.log("✅ Firebase Device Updated");
 
-    if (previousLevel === "high" && currentLevel === "low") {
-  await db.collection("alerts").add({
-    customerId,
-    deviceId,
-    type: "low_water",
-    water_level: currentLevel,
-    createdAt: new Date(),
-  });
+    if (currentLevel === "low") {
+      console.log("🚨 LOW WATER DETECTED");
 
-  console.log("✅ Low water alert stored");
+      await db.collection("alerts").add({
+        customerId,
+        deviceId,
+        type: "low_water",
+        water_level: currentLevel,
+        createdAt: new Date(),
+      });
 
-  await db.collection("notifications").add({
-    customerId,
-    deviceId,
-    type: "low_water",
-    title: "Low Water Alert Sent",
-    message: `Low water alert sent for ${deviceId}`,
-    read: false,
-    createdAt: new Date(),
-  });
-}
-
-    console.log("previousLevel =", previousLevel);
-    console.log("currentLevel =", currentLevel);
-
-    if (previousLevel === "high" && currentLevel === "low") {
-      console.log("🚨 HIGH -> LOW detected");
+      await db.collection("notifications").add({
+        customerId,
+        deviceId,
+        type: "low_water",
+        title: "Low Water Alert Sent",
+        message: `Low water alert sent for ${deviceId}`,
+        read: false,
+        createdAt: new Date(),
+      });
 
       const existingOrders = await db
         .collection("orders")
         .where("deviceId", "==", deviceId)
         .where("status", "==", "PENDING")
+        .limit(1)
         .get();
 
       if (!existingOrders.empty) {
-        console.log("Pending order already exists");
-
+        console.log("Pending order already exists. Not sending duplicate request.");
         return res.send("Pending order already exists");
       }
 
@@ -403,8 +396,8 @@ ${deviceId}`;
         orderId,
         createdAt: new Date(),
       });
-    } else if (previousLevel === "low" && currentLevel === "high") {
-      console.log("✅ LOW -> HIGH detected");
+    } else if (currentLevel === "high") {
+      console.log("✅ HIGH WATER DETECTED");
 
       const pendingOrders = await db
         .collection("orders")
@@ -451,7 +444,7 @@ Invoice Sent To Customer`,
         });
       }
     } else {
-      console.log("ℹ️ No state change. No alert sent.");
+      console.log("ℹ️ Unknown water level:", currentLevel);
     }
 
     res.send("Data stored successfully");
